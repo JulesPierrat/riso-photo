@@ -25,7 +25,7 @@ from .errors import ProfileError, UsageError
 CONFIG_DIR = Path("config")
 
 SEPARATION_METHODS = ("luminance", "duotone", "tritone", "cmyk", "density-lsq")
-HALFTONE_METHODS = ("none", "clustered-dot", "error-diffusion", "bayer")
+HALFTONE_METHODS = ("none", "clustered-dot", "blue-noise", "bayer")
 DOT_SHAPES = ("round", "ellipse", "square", "line")
 OUTPUT_FORMATS = ("png", "tiff")
 BIT_DEPTHS = (8, 16)

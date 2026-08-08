@@ -196,7 +196,7 @@ def _screen_line(profile: Profile, index: int, halftoned: bool) -> str:
         )
     if halftone.method == "bayer":
         return f"tramage ordonné Bayer {halftone.matrix_size}×{halftone.matrix_size}"
-    return "diffusion d'erreur (trame stochastique, insensible au moiré)"
+    return "bruit bleu (trame stochastique, insensible au moiré)"
 
 
 def _vigilance(

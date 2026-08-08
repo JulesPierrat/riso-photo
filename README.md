@@ -10,7 +10,7 @@ Une risographe n'imprime qu'une encre à la fois : un visuel en trois couleurs, 
 
 Les encres sont libres : rose fluo, bleu, jaune, vert, noir — pas seulement du CMJN. C'est ce que permet la méthode de séparation par défaut, décrite dans [`doc/separation.md`](doc/separation.md).
 
-> **État du projet — v0.1.** La chaîne complète fonctionne : séparations `luminance`, `duotone`, `tritone` et `density-lsq`, aperçu, rapports. Les calques sortent en **ton continu** — le tramage arrive en v0.3, d'ici là c'est le pilote de la risographe qui tramera. Voir [`doc/roadmap.md`](doc/roadmap.md).
+> **État du projet — v0.3.** Les calques partent directement en machine : séparations `luminance`, `duotone`, `tritone` et `density-lsq`, tramage AM et FM, aperçu, rapports. Restent les repères de calage et la méthode `cmyk`. Voir [`doc/roadmap.md`](doc/roadmap.md).
 
 ---
 

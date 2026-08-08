@@ -128,8 +128,12 @@ def limit_ink(cov: np.ndarray, profile: Profile) -> tuple[np.ndarray, dict]
 ```python
 def halftone(cov: np.ndarray, cfg: HalftoneCfg,
              angle_deg: float, dpi: int) -> np.ndarray   # binaire {0., 1.}
-def check_angles(inks: Sequence[Ink]) -> list[str]       # avertissements
+def clustered_dot(cov, lpi, dpi, angle_deg, shape) -> np.ndarray
+def bayer(cov, size) -> np.ndarray
+def blue_noise(cov) -> np.ndarray
 ```
+
+Le contrôle des angles, initialement prévu ici sous le nom `check_angles`, est resté dans `config.py` : il appartient à la validation du profil, qui tourne avant tout calcul pixel, et le déplacer imposerait un cycle d'imports entre `config` et `halftone`.
 
 ### `src/preview.py`
 
@@ -304,11 +308,15 @@ Le plan prévoyait `scipy.optimize.lsq_linear` avec repli intégré. Ce contrat 
 | **Dépend de** | Lot 6 |
 | **Taille** | ~250 lignes |
 
-Les trois méthodes de [halftone.md](halftone.md), `check_angles`, l'avertissement sur le rapport `dpi / lpi`, et l'option `--preview-halftoned`.
+Les trois méthodes de [halftone.md](halftone.md), l'égalisation des fonctions de point, et l'option `--preview-halftoned`.
 
-`error-diffusion` est séquentiel par nature : l'écrire d'abord en NumPy ligne par ligne, et n'optimiser que si le temps de traitement devient gênant.
+Deux écarts au contrat :
 
-**Fin de lot** — un aplat à 50 % tramé puis moyenné redonne 50 % à 2 % près, pour les trois méthodes. Deux encres à 15° et 45° ne produisent pas de moiré visible sur un dégradé. `check_angles` avertit bien pour une paire à 5° et 95°, qui sont le même angle.
+`check_angles` n'a pas lieu d'être dans `halftone.py` : le contrôle des angles appartient à la validation du profil, qui tourne **avant** tout calcul pixel — c'est un principe posé au lot 1, et le déplacer imposerait un cycle d'imports entre `config` et `halftone`. La règle reste dans `config.py`, avec son test.
+
+`error-diffusion` est remplacé par `blue-noise`. Floyd–Steinberg est séquentiel par construction — chaque pixel dépend du précédent — donc non vectorisable : plusieurs minutes par calque sur 37 Mpx. Un masque de bruit bleu, construit une fois par « vides et amas », donne le même caractère FM en un seul produit vectorisé.
+
+**Fin de lot** — un aplat tramé puis moyenné redonne la couverture demandée à 2 % près, sur toute la gamme et pour les trois méthodes. Deux encres à 15° et 45° ne produisent pas de moiré mesurable, là où 15° et 17° en produisent un.
 
 ---
 

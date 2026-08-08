@@ -194,7 +194,7 @@ La risographe écrase les basses lumières et délave les hautes lumières. Un l
 
 | Champ | Type | Défaut | Rôle |
 |---|---|---|---|
-| `method` | enum | `clustered-dot` | `none`, `clustered-dot`, `error-diffusion`, `bayer`. |
+| `method` | enum | `clustered-dot` | `none`, `clustered-dot`, `blue-noise`, `bayer`. |
 | `lpi` | entier | `60` | Linéature, en lignes par pouce. Plage utile 40–85. |
 | `dot_shape` | enum | `round` | `round`, `ellipse`, `square`, `line`. Uniquement pour `clustered-dot`. |
 | `matrix_size` | entier | `8` | Taille de la matrice de Bayer. Uniquement pour `bayer`. |

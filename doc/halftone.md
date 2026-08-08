@@ -15,7 +15,7 @@ Deux stratégies :
 |---|---|---|
 | `none` | Ton continu | Premiers essais, ou prestataire qui préfère gérer sa trame. |
 | `clustered-dot` | Trame AM classique, points de taille variable sur grille régulière | Le look riso canonique. Exige des angles distincts par encre. |
-| `error-diffusion` | Trame FM stochastique (Floyd–Steinberg) | Aucun moiré possible. Rendu granuleux, photographique. Robuste quand le repérage est incertain. |
+| `blue-noise` | Trame FM stochastique | Aucun moiré possible. Rendu granuleux, photographique. Robuste quand le repérage est incertain. |
 | `bayer` | Tramage ordonné, motif régulier visible | Rendu rétro assumé, motif graphique. |
 
 ### `clustered-dot`
@@ -29,15 +29,25 @@ Points centrés sur une grille inclinée, dont le diamètre croît avec la couve
 - `square` — dur, graphique.
 - `line` — trame ligne, très marquée.
 
-### `error-diffusion`
+### `blue-noise`
 
-Seuillage pixel par pixel, l'erreur commise étant répartie sur les pixels voisins non encore traités (Floyd–Steinberg). Les points sont irréguliers, sans structure périodique.
+Seuillage par un masque stochastique dont les positions sont classées de sorte que, pour tout seuil, les points retenus soient répartis le plus uniformément possible — sans jamais former de structure périodique. Le masque est construit une fois par la méthode « vides et amas » d'Ulichney, puis répété sur l'image.
 
 Deux conséquences utiles : **le moiré est structurellement impossible**, et les angles de trame deviennent sans objet. C'est le choix sûr quand on empile 4 encres ou plus, ou quand la machine a un repérage capricieux. En contrepartie, le rendu est bruité et les très basses lumières peuvent s'empâter.
+
+La spécification initiale annonçait de la diffusion d'erreur (Floyd–Steinberg). Elle a été écartée : chaque pixel y dépend du précédent, ce qui interdit toute vectorisation — un calque de 37 Mpx demanderait plusieurs minutes en Python, et il y en a un par encre. Un masque de bruit bleu donne le même caractère FM, se calcule d'un seul coup, et évite au passage les « vers » caractéristiques de Floyd–Steinberg.
 
 ### `bayer`
 
 Seuillage par matrice ordonnée de taille `matrix_size` (4, 8 ou 16). Motif régulier parfaitement visible — c'est le but. Rapide, reproductible, esthétique rétro très marquée.
+
+## Égalisation
+
+Une fonction de point brute n'est pas égalisée : demander 25 % de couverture n'encre pas 25 % de la surface. L'écart est faible mais systématique, et décale toute la gamme tonale du tirage.
+
+Le programme tabule donc la fonction de répartition de chaque fonction de point et l'applique aux seuils, ce qui les rend uniformes sur [0, 1]. La surface encrée vaut alors exactement la couverture demandée, pour les quatre formes de point. Mesuré : moins de 0.1 % d'écart aux angles obliques.
+
+**Cas dégénéré.** Quand la trame est alignée sur la grille pixel (0° ou 90°) *et* que la cellule fait un nombre entier de pixels, toutes les cellules retombent sur les mêmes points de la fonction de point. L'égalisation, calculée sur une répartition continue, ne correspond plus à ce petit échantillon discret : à 600 dpi et 60 lpi, la gamme se décalait jusqu'à 4 %. Le programme décale alors la cellule d'un demi pour cent, ce qui décorrèle les phases et ramène l'écart sous 0.2 %. La linéature bouge de 0.3 lpi, invisible.
 
 ---
 
@@ -75,7 +85,7 @@ niveaux ≈ (dpi / lpi)² + 1
 
 Le programme avertit quand `dpi / lpi < 8`.
 
-Cette contrainte ne s'applique pas à `error-diffusion`, qui module la densité des points et non leur taille.
+Cette contrainte ne s'applique pas à `blue-noise` ni à `bayer`, qui modulent la densité des points et non leur taille.
 
 ---
 
@@ -95,6 +105,6 @@ L'écart de 30° entre trames est l'optimum classique de l'offset. Avec 4 encres
 
 45° est l'angle le moins perceptible à l'œil : le réserver à l'encre dominante, généralement le noir.
 
-Le programme **avertit** si deux encres du profil sont à moins de 15° d'écart, en tenant compte de la périodicité à 90° des trames (5° et 95° sont le même angle).
+Le programme **avertit** si deux encres du profil sont à moins de 15° d'écart, en tenant compte de la périodicité à 90° des trames (5° et 95° sont le même angle). Le contrôle a lieu à la validation du profil, avant tout calcul — voir [config.md](config.md).
 
-En cas de doute — beaucoup d'encres, machine à repérage approximatif, aplats de couleur importants — `error-diffusion` élimine le problème par construction.
+En cas de doute — beaucoup d'encres, machine à repérage approximatif, aplats de couleur importants — `blue-noise` élimine le problème par construction.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+import numpy as np
 import pytest
 
 from src.cli import build_parser, cli_overrides, main
@@ -100,9 +101,54 @@ def test_run_json_reproduit_le_profil(workspace, monkeypatch):
     assert payload["total_ink_max"] <= 1.7 + 1e-6
 
 
-def test_avertissement_de_tramage_manquant(workspace, monkeypatch, capsys):
+def test_les_calques_sortent_trames(workspace, monkeypatch):
+    """Le profil de test demande `clustered-dot` : les fichiers doivent l'être."""
+    from PIL import Image
+
     run(["demo", "-c", "test"], workspace, monkeypatch)
-    assert "ton continu" in capsys.readouterr().out
+
+    calque = np.asarray(
+        Image.open(workspace / "project" / "demo" / "output" / "01_pink.png")
+    )
+    assert set(np.unique(calque)) <= {0, 255}
+
+
+def test_no_halftone_produit_du_ton_continu(workspace, monkeypatch):
+    from PIL import Image
+
+    run(["demo", "-c", "test", "--no-halftone"], workspace, monkeypatch)
+
+    calque = np.asarray(
+        Image.open(workspace / "project" / "demo" / "output" / "01_pink.png")
+    )
+    assert len(np.unique(calque)) > 2
+
+
+def test_le_plan_decrit_la_trame_appliquee(workspace, monkeypatch):
+    run(["demo", "-c", "test"], workspace, monkeypatch)
+    plan = (workspace / "project" / "demo" / "output" / "todo.md").read_text(
+        encoding="utf-8"
+    )
+    assert "points agglomérés" in plan
+    assert "ton continu" not in plan
+
+
+def test_preview_halftoned(workspace, monkeypatch):
+    """L'aperçu tramé montre le grain, donc plus de détail que le continu."""
+    from PIL import Image
+
+    output = workspace / "project" / "demo" / "output"
+
+    run(["demo", "-c", "test", "--dpi", "600"], workspace, monkeypatch)
+    continu = np.asarray(Image.open(output / "preview.png")).astype(np.int16)
+
+    run(["demo", "-c", "test", "--dpi", "600", "--preview-halftoned"], workspace, monkeypatch)
+    trame = np.asarray(Image.open(output / "preview.png")).astype(np.int16)
+
+    assert trame.shape == continu.shape
+    assert float(np.abs(np.diff(trame, axis=1)).mean()) > float(
+        np.abs(np.diff(continu, axis=1)).mean()
+    )
 
 
 def test_out_pas_encore_ecrit(workspace, monkeypatch, capsys):

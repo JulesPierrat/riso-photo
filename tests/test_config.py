@@ -203,7 +203,7 @@ def test_periodicite_des_angles_a_90_degres(profile_data):
 
 def test_pas_davertissement_dangle_hors_trame_am(profile_data):
     profile_data["inks"][1]["screen_angle"] = 20
-    profile_data["halftone"]["method"] = "error-diffusion"
+    profile_data["halftone"]["method"] = "blue-noise"
     assert not any("moiré" in w for w in build_profile(profile_data).warnings)
 
 

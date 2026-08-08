@@ -161,9 +161,9 @@ def test_ton_continu_quand_le_tramage_na_pas_eu_lieu(tmp_path):
     assert "points agglomérés" not in texte
 
 
-def test_diffusion_derreur(tmp_path):
-    texte = todo(tmp_path, profile=duo(halftone={"method": "error-diffusion"}))
-    assert "diffusion d'erreur" in texte
+def test_bruit_bleu(tmp_path):
+    texte = todo(tmp_path, profile=duo(halftone={"method": "blue-noise"}))
+    assert "bruit bleu" in texte
 
 
 # --------------------------------------------------------------------------

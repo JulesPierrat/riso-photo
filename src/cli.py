@@ -11,9 +11,12 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+import numpy as np
+
 from . import __version__
 from .config import CONFIG_DIR, Profile, load_profile
 from .errors import NotImplementedYet, RisoError
+from .halftone import halftone
 from .image import (
     apply_tone,
     load_linear,
@@ -127,7 +130,7 @@ def render_summary(
     elif half.method == "bayer":
         lines.append(f"Trame      : Bayer {half.matrix_size}×{half.matrix_size}")
     else:
-        lines.append("Trame      : diffusion d'erreur")
+        lines.append("Trame      : bruit bleu (stochastique)")
 
     long_edge = target_long_edge_px(out.long_edge_mm, out.dpi)
     lines.append(
@@ -240,11 +243,6 @@ def run(args: argparse.Namespace) -> int:
             "`--out` n'est pas encore là (lot 8, voir doc/plan.md). La sortie "
             "va dans le dossier `output/` du projet."
         )
-    if args.preview_halftoned:
-        raise NotImplementedYet(
-            "`--preview-halftoned` attend le tramage (lot 7, voir doc/plan.md)."
-        )
-
     print("\nTraitement…")
     img = load_linear(project.source)
     img = resize_to(
@@ -260,18 +258,32 @@ def run(args: argparse.Namespace) -> int:
 
     print(render_coverage(profile, coverage, ink_stats))
 
-    if profile.halftone.method != "none":
-        warnings.append(
-            f"tramage {profile.halftone.method!r} demandé mais pas encore écrit "
-            "(lot 7) : les calques sortent en ton continu, à tramer par le "
-            "pilote de la machine."
+    halftoned = profile.halftone.method != "none"
+    if halftoned:
+        # Le tramage remplace les couvertures continues : l'aperçu par défaut
+        # est calculé avant, sur les valeurs continues, parce qu'il se lit
+        # mieux. `--preview-halftoned` le recalcule après, grain compris.
+        screened = np.stack(
+            [
+                halftone(coverage[index], profile.halftone, ink.screen_angle,
+                         profile.output.dpi)
+                for index, ink in enumerate(profile.inks)
+            ]
         )
+        if args.verbose:
+            print(f"  trame      : {profile.halftone.method}")
+    else:
+        screened = coverage
 
     output_dir = prepare_output(project)
     written = []
 
     preview_path = output_dir / PREVIEW_FILENAME
-    write_preview(composite(coverage, profile), preview_path, profile.output)
+    write_preview(
+        composite(screened if args.preview_halftoned else coverage, profile),
+        preview_path,
+        profile.output,
+    )
     written.append(preview_path)
 
     layers = layer_stats(profile, coverage)
@@ -288,13 +300,12 @@ def run(args: argparse.Namespace) -> int:
     if not args.preview_only:
         for index in range(len(profile.inks)):
             path = output_dir / layers[index].file
-            write_layer(coverage[index], path, profile.output)
+            write_layer(screened[index], path, profile.output)
             written.append(path)
 
         todo_path = output_dir / TODO_FILENAME
-        # `halftoned=False` tant que le lot 7 n'est pas là : le plan doit dire
-        # ce qui est réellement dans les fichiers, pas ce que le profil demande.
-        write_todo(todo_path, **reports, halftoned=False)
+        # Le plan décrit ce qui est réellement dans les fichiers.
+        write_todo(todo_path, **reports, halftoned=halftoned)
         written.append(todo_path)
 
     write_run_json(output_dir / RUN_SIGNATURE, **reports)
