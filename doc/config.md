@@ -220,10 +220,11 @@ Le profil est validé intégralement **avant** tout calcul, pour éviter d'écho
 
 ### Avertissements (n'interrompent pas)
 
-- Deux encres à moins de 15° d'écart de trame → risque de moiré.
+- Deux encres à moins de 15° d'écart de trame, en `clustered-dot` → risque de moiré. L'écart tient compte de la périodicité des trames à 90° : 5° et 95° sont le même angle. Les autres méthodes de tramage n'utilisent pas les angles, l'avertissement ne s'y applique pas.
 - `total_ink_limit` > 2.4 → risque de saturation du papier.
 - `dpi / lpi` < 8 en `clustered-dot` → dégradés en escalier, voir [halftone.md](halftone.md).
 - `bit_depth: 16` avec un tramage actif → sans effet, la sortie est binaire.
 - Une encre dont `color` est très proche de `paper.color` → contribution quasi nulle.
+- Clé inconnue dans une section → probable faute de frappe, la valeur est ignorée.
 
 Chaque avertissement remonte sur la sortie standard **et** dans le `todo.md`, pour qu'il atteigne la personne qui imprime et pas seulement celle qui lance le programme.

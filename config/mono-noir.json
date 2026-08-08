@@ -1,0 +1,50 @@
+{
+  "name": "Noir seul",
+  "description": "Un passage, encre noire sur papier blanc. Profil de référence : sert à juger si un duotone apporte vraiment quelque chose.",
+
+  "inks": [
+    {
+      "name": "black",
+      "label": "Black",
+      "color": "#231F20",
+      "order": 1,
+      "opacity": 1.0,
+      "screen_angle": 45,
+      "max_coverage": 0.9
+    }
+  ],
+
+  "paper": {
+    "color": "#FFFFFF",
+    "label": "Blanc 120g non couché"
+  },
+
+  "separation": {
+    "method": "luminance",
+    "total_ink_limit": 0.9,
+    "preserve_highlights": true
+  },
+
+  "tone": {
+    "gamma": 1.0,
+    "contrast": 0.12,
+    "black_point": 0.02,
+    "white_point": 0.98
+  },
+
+  "halftone": {
+    "method": "clustered-dot",
+    "lpi": 60,
+    "dot_shape": "round"
+  },
+
+  "output": {
+    "dpi": 600,
+    "format": "png",
+    "bit_depth": 8,
+    "invert": false,
+    "long_edge_mm": 297,
+    "registration_marks": true,
+    "margin_mm": 5
+  }
+}

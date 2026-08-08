@@ -8,6 +8,8 @@ riso-photo/
 ├── requirements.txt
 ├── src/
 │   ├── cli.py                 # parsing des arguments, orchestration du pipeline
+│   ├── errors.py              # hiérarchie d'exceptions et codes de sortie
+│   ├── color.py               # conversions sRVB ↔ linéaire, parsing hexadécimal
 │   ├── config.py              # chargement + validation du profil JSON
 │   ├── project.py             # résolution du dossier projet, détection de la source
 │   ├── image.py               # chargement, colorimétrie, redimensionnement, courbes tonales
@@ -35,6 +37,8 @@ riso-photo/
 | Module | Responsabilité | Ne fait pas |
 |---|---|---|
 | `cli.py` | Enchaîne les étapes, gère les options, affiche la progression et les avertissements. | Aucun calcul image. |
+| `errors.py` | Définit les exceptions et le code de sortie que chacune porte. | Aucune logique. |
+| `color.py` | Conversions sRVB ↔ linéaire, parsing des couleurs hexadécimales. | N'importe rien de `src/`. |
 | `config.py` | Lit le JSON, applique les valeurs par défaut, valide, produit un objet `Profile` figé. | N'accède pas au disque projet. |
 | `project.py` | Localise `project/<nom>/`, identifie l'image source, prépare et vide `output/`. | Ne lit pas les pixels. |
 | `image.py` | Décodage, conversion vers sRGB, passage en linéaire, redimensionnement, courbes `tone`. | Ne connaît pas les encres. |

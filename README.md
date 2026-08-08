@@ -65,7 +65,7 @@ Les profils vivent dans `config/`. Ils décrivent les encres, le papier et les r
 
 ```bash
 ls config/
-# duotone-rose-noir.json  mono-noir.json  quadri-riso.json  trichro-cmj.json
+# duotone-rose-noir.json  mono-noir.json
 ```
 
 Prendre le plus proche du matériel disponible, quitte à l'adapter ensuite. Le champ le plus important est la couleur de chaque encre : la référence complète est dans [`doc/config.md`](doc/config.md).

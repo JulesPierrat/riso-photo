@@ -27,8 +27,21 @@ Fixés avant écriture. Toute image intermédiaire est un `numpy.float32` dans `
 ```python
 class RisoError(Exception):          code = 3
 class UsageError(RisoError):         code = 1   # projet/profil introuvable, source ambiguë
-class ProfileError(RisoError):       code = 2   # validation du JSON
+class ProfileError(RisoError):       code = 2   # validation du JSON, porte tous les problèmes
+class NotImplementedYet(RisoError):  code = 3   # lot en cours, message explicite
 ```
+
+### `src/color.py`
+
+```python
+def parse_hex(value: str) -> str                 # normalise en "#RRGGBB"
+def hex_to_srgb(value: str) -> np.ndarray        # (3,) sRVB encodé
+def hex_to_linear(value: str) -> np.ndarray      # (3,) linéaire, lecture seule
+def srgb_to_linear(a: np.ndarray) -> np.ndarray
+def linear_to_srgb(a: np.ndarray) -> np.ndarray
+```
+
+Module sans dépendance vers le reste de `src/`. Les conversions sRVB étaient initialement prévues dans `image.py` et le parsing hexadécimal dans `inks.py`, mais `config.py` a besoin des deux dès le lot 1 — les laisser là aurait créé un cycle `config` → `inks` → `config`. `image.py` et `inks.py` s'appuient dessus.
 
 ### `src/config.py`
 
@@ -76,8 +89,6 @@ def prepare_output(project: Project) -> None
 ### `src/image.py`
 
 ```python
-def srgb_to_linear(a: np.ndarray) -> np.ndarray
-def linear_to_srgb(a: np.ndarray) -> np.ndarray
 def load_linear(path: Path) -> np.ndarray            # (H, W, 3)
 def target_long_edge_px(long_edge_mm: float, dpi: int) -> int
 def resize_to(img: np.ndarray, long_edge_px: int) -> np.ndarray
@@ -88,7 +99,6 @@ def luminance(img: np.ndarray) -> np.ndarray         # (H, W)
 ### `src/inks.py`
 
 ```python
-def hex_to_linear(s: str) -> np.ndarray              # (3,)
 def to_density(linear: np.ndarray, floor: float = 1e-4) -> np.ndarray
 def from_density(d: np.ndarray) -> np.ndarray
 def ink_density(ink: Ink) -> np.ndarray              # (3,)
@@ -173,13 +183,15 @@ def main(argv: list[str] | None = None) -> int
 | | |
 |---|---|
 | **Objectif** | Résoudre un projet et un profil, valider, afficher — sans toucher aux pixels. |
-| **Fichiers** | `src/project.py`, `src/config.py`, `src/cli.py`, `config/mono-noir.json`, `config/duotone-rose-noir.json` |
+| **Fichiers** | `src/color.py`, `src/project.py`, `src/config.py`, `src/cli.py`, `config/mono-noir.json`, `config/duotone-rose-noir.json` |
 | **Dépend de** | Lot 0 |
 | **Taille** | ~350 lignes |
 
 Le gros du travail est la validation : toutes les règles de [config.md](config.md), erreurs bloquantes **et** avertissements accumulés. C'est le module le plus long du projet et le plus rentable à tester — chaque règle non vérifiée ici devient un plantage obscur trois étapes plus loin.
 
 Les deux premiers profils sont écrits maintenant parce qu'ils servent de fixtures aux tests.
+
+La fusion du `config.json` local au projet, initialement prévue au lot 8, est faite ici : douze lignes, et cela évite de laisser le paramètre `project_dir` de `load_profile` sans effet.
 
 **Fin de lot** — `python riso-photo.py demo -c duotone-rose-noir --dry-run` affiche le profil résolu et ses avertissements. Un JSON fautif produit la liste complète des erreurs et le code `2`. Un projet inexistant liste les projets disponibles et retourne `1`.
 
@@ -295,13 +307,15 @@ Les trois méthodes de [halftone.md](halftone.md), `check_angles`, l'avertisseme
 | **Dépend de** | Lot 7 |
 | **Taille** | ~250 lignes |
 
-Marges et repères de calage, méthodes `cmyk` et `tritone`, fusion du `config.json` local, options CLI restantes (`--out`, `-v`).
+Marges et repères de calage, méthodes `cmyk` et `tritone`, options CLI restantes (`--out`, `--preview-halftoned`).
 
 **Fin de lot** — les repères tombent au pixel près à la même position sur tous les calques. C'est le seul critère qui compte : un décalage d'un pixel entre deux calques rend les repères inutilisables pour caler la machine.
 
 ---
 
 ## Stratégie de test
+
+Les tests s'exécutent avec `python3 -m pytest` depuis la racine du dépôt. Dépendances de développement dans `requirements-dev.txt`.
 
 **Fixtures synthétiques, pas de binaire dans le repo.** `tests/fixtures/make_fixtures.py` génère de façon déterministe une image de test : rampe de luminance horizontale, mire de couleurs primaires et secondaires, plage de tons chair, aplats noir et blanc purs. Petite, reproductible, et couvrant les cas où les erreurs de colorimétrie se voient.
 

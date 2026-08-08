@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- riso-photo ---
+# Projets utilisateur : photos sources et sorties de calcul, jamais versionnés.
+/project/*
+!/project/.gitkeep

@@ -1,0 +1,64 @@
+{
+  "name": "Duotone rose fluo / noir",
+  "description": "Deux passages, portrait contrasté sur papier crème 170g.",
+
+  "inks": [
+    {
+      "name": "fluo-pink",
+      "label": "Fluorescent Pink",
+      "color": "#FF48B0",
+      "order": 1,
+      "opacity": 0.85,
+      "screen_angle": 15,
+      "max_coverage": 0.9
+    },
+    {
+      "name": "black",
+      "label": "Black",
+      "color": "#231F20",
+      "order": 2,
+      "opacity": 1.0,
+      "screen_angle": 45,
+      "max_coverage": 0.85
+    }
+  ],
+
+  "paper": {
+    "color": "#F4EFE2",
+    "label": "Crème 170g non couché"
+  },
+
+  "separation": {
+    "method": "duotone",
+    "total_ink_limit": 1.7,
+    "preserve_highlights": true,
+    "curves": {
+      "fluo-pink": [[0.0, 0.0], [0.35, 0.85], [0.75, 0.45], [1.0, 0.0]],
+      "black": [[0.0, 1.0], [0.45, 0.55], [0.8, 0.05], [1.0, 0.0]]
+    }
+  },
+
+  "tone": {
+    "gamma": 1.1,
+    "contrast": 0.15,
+    "black_point": 0.02,
+    "white_point": 0.98,
+    "desaturate": 0.0
+  },
+
+  "halftone": {
+    "method": "clustered-dot",
+    "lpi": 60,
+    "dot_shape": "round"
+  },
+
+  "output": {
+    "dpi": 600,
+    "format": "png",
+    "bit_depth": 8,
+    "invert": false,
+    "long_edge_mm": 297,
+    "registration_marks": true,
+    "margin_mm": 5
+  }
+}
