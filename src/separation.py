@@ -61,6 +61,11 @@ _SOLVER_CHUNK = 2_000_000
 #: Un travail riso dépasse rarement quatre passages.
 _MAX_INKS_LSQ = 5
 
+#: Crête de stabilisation, en fraction de l'échelle des encres chromatiques.
+#: Assez petite pour ne pas biaiser les couvertures, assez grande pour
+#: départager les solutions quasi équivalentes.
+_STABILISER = 0.02
+
 _FREE, _AT_ZERO, _AT_CAP = 0, 1, 2
 
 
@@ -233,11 +238,22 @@ def build_system(profile: Profile) -> tuple[np.ndarray, np.ndarray]:
     caps = np.array([ink.max_coverage for ink in inks], dtype=np.float32)
 
     rows = [weighted]
+    darkest = int(np.argmax(luminance_density(inks)))
+    light = [i for i in range(len(inks)) if i != darkest] or [darkest]
+
+    # Échelle de référence : les seules encres chromatiques. La moyenne de
+    # toutes les colonnes serait dominée par l'encre foncée — un noir dense
+    # pèse une dizaine de fois une encre chromatique — et toute pénalité
+    # calée dessus étoufferait la couleur au lieu de l'arbitrer.
+    scale = float(np.mean(np.sum(weighted[:, light] ** 2, axis=0)))
+
+    # Stabilisateur permanent. Quand plusieurs combinaisons d'encres rendent
+    # presque la même couleur, le choix bascule d'un pixel à l'autre et
+    # l'image se mouchette. Une crête minime tranche ces quasi-ex æquo de
+    # façon continue, sans peser sur les couvertures elles-mêmes.
+    rows.append(np.eye(len(inks), dtype=np.float32) * np.sqrt(_STABILISER * scale))
 
     if len(inks) > 3 and profile.separation.black_generation > 0.0:
-        scale = float(np.mean(np.sum(weighted**2, axis=0)))
-        darkest = int(np.argmax(luminance_density(inks)))
-        light = [i for i in range(len(inks)) if i != darkest]
         penalty = np.zeros((len(light), len(inks)), dtype=np.float32)
         penalty[np.arange(len(light)), light] = np.sqrt(
             profile.separation.black_generation * scale
