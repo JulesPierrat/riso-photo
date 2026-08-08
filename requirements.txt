@@ -1,0 +1,7 @@
+Pillow>=10.0
+numpy>=1.24
+
+# Optionnel : solveur de moindres carrés bornés pour la séparation `density-lsq`.
+# Sans SciPy, le programme bascule sur un solveur par projection intégré,
+# un peu moins précis mais fonctionnel.
+scipy>=1.11
