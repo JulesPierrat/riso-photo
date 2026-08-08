@@ -93,6 +93,21 @@ Un objet par encre, donc par passage machine. Au moins un, pas de maximum théor
 | `screen_angle` | degrés | voir [halftone.md](halftone.md) | Angle de trame. |
 | `max_coverage` | 0.0–1.0 | `1.0` | Plafond d'encrage pour ce calque seul. |
 
+### `max_coverage` coûte plus cher qu'il n'y paraît
+
+Le modèle traite une couverture de 90 % comme 90 % de surface encrée et 10 % de papier nu. Ces 10 % de blanc dominent le mélange : avec une encre noire sur papier blanc, le ton le plus sombre atteignable tombe à 0.37 en sRVB — un gris moyen, pas un noir.
+
+| Plafond | Ton le plus sombre |
+|---|---|
+| 85 % | 0.44 |
+| 90 % | 0.37 |
+| 95 % | 0.28 |
+| 100 % | 0.13 |
+
+Sur un tirage réel, l'engraissement du point et la diffusion optique du papier rattrapent une partie de l'écart — le modèle les ignore (voir les limites dans [separation.md](separation.md)). L'ordre de grandeur reste : plafonner une encre foncée à 90 % ampute franchement les ombres.
+
+D'où le réglage des profils livrés. `mono-noir` laisse son unique encre monter à 100 %, un seul passage ne saturant pas le papier ; `duotone-rose-noir` plafonne à 85–90 %, parce que c'est le **cumul** des deux passages qui justifie la précaution, pas chaque calque pris isolément. Pour brider un cumul, `total_ink_limit` est le bon outil — `max_coverage` sert à brider une encre en particulier.
+
 ### `color` — le champ qui compte
 
 C'est la donnée la plus déterminante du profil, et celle qui mérite le plus d'attention. Les valeurs des chartes constructeur sont des approximations écran ; les encres fluo en particulier sont hors gamut sRVB et ne peuvent pas être représentées fidèlement.

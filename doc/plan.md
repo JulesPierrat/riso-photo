@@ -252,6 +252,8 @@ Deux étapes passent par une table de correspondance plutôt que par un calcul p
 
 Sortie en ton continu uniquement — pas de tramage, pas de repères, pas de marges. Le but est d'obtenir des PNG regardables.
 
+`run.json` est écrit dès ce lot, par `report.py`, alors que le reste des rapports attend le lot 5 : sa présence est la signature qui autorise `prepare_output` à vider le dossier. Sans lui, un deuxième run refuserait d'écraser le premier et le comportement d'écrasement annoncé dans [cli.md](cli.md) ne tiendrait pas.
+
 **Fin de lot** — `python riso-photo.py demo -c duotone-rose-noir` écrit `01_*.png`, `02_*.png` et `preview.png`. Un profil à une seule encre noire sur papier blanc donne un `preview.png` visuellement identique à la source désaturée : c'est le test de bout en bout du modèle colorimétrique.
 
 ---
@@ -260,12 +262,12 @@ Sortie en ton continu uniquement — pas de tramage, pas de repères, pas de mar
 
 | | |
 |---|---|
-| **Objectif** | `todo.md` et `run.json`. La chaîne minimale est complète. |
-| **Fichiers** | `src/report.py` |
+| **Objectif** | `todo.md`. La chaîne minimale est complète. |
+| **Fichiers** | `src/report.py` (complété) |
 | **Dépend de** | Lot 4 |
-| **Taille** | ~200 lignes |
+| **Taille** | ~150 lignes |
 
-Le `todo.md` est rendu à partir des statistiques réelles du run, selon la spécification de [sorties.md](sorties.md). `run.json` devient la signature qui autorise `prepare_output` à vider le dossier.
+Le `todo.md` est rendu à partir des statistiques réelles du run, selon la spécification de [sorties.md](sorties.md). `run.json` a déjà été livré au lot 4, dont il conditionnait le comportement d'écrasement.
 
 **Fin de lot** — un run produit les cinq fichiers attendus. **C'est le moment d'imprimer.** Le tirage d'essai sert à corriger les `color` des profils, et rien ne devrait avancer avant cette validation physique.
 

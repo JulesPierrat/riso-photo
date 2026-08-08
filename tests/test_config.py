@@ -298,7 +298,7 @@ def test_fusion_du_config_local(workspace, monkeypatch):
     profile = load_profile("test", project_dir=demo)
     assert profile.output.dpi == 1200
     # La fusion est profonde : les autres champs de `output` survivent.
-    assert profile.output.long_edge_mm == 297.0
+    assert profile.output.long_edge_mm == 12.0
     assert any("config.json" in s for s in profile.sources)
 
 

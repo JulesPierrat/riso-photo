@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -123,6 +123,45 @@ class Profile:
     output: OutputCfg
     warnings: tuple[str, ...]
     sources: tuple[str, ...]  # traçabilité : fichiers et surcharges appliqués
+
+    def as_dict(self) -> dict:
+        """Profil résolu, sérialisable — pour `run.json`.
+
+        Les couleurs repartent en hexadécimal : c'est ce que l'utilisateur a
+        écrit, et ce qu'il devra recopier pour reproduire le tirage.
+        """
+        return {
+            "name": self.name,
+            "description": self.description,
+            "inks": [
+                {
+                    "name": ink.name,
+                    "label": ink.label,
+                    "color": ink.color_hex,
+                    "order": ink.order,
+                    "opacity": ink.opacity,
+                    "screen_angle": ink.screen_angle,
+                    "max_coverage": ink.max_coverage,
+                }
+                for ink in self.inks
+            ],
+            "paper": {"color": self.paper.color_hex, "label": self.paper.label},
+            "separation": {
+                "method": self.separation.method,
+                "total_ink_limit": self.separation.total_ink_limit,
+                "black_generation": self.separation.black_generation,
+                "preserve_highlights": self.separation.preserve_highlights,
+                "curves": (
+                    {name: [list(p) for p in points]
+                     for name, points in self.separation.curves.items()}
+                    if self.separation.curves
+                    else None
+                ),
+            },
+            "tone": asdict(self.tone),
+            "halftone": asdict(self.halftone),
+            "output": asdict(self.output),
+        }
 
     @property
     def darkest_ink(self) -> Ink:

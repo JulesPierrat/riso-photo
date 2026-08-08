@@ -22,7 +22,10 @@ from .image import (
     source_size,
     target_long_edge_px,
 )
-from .project import PROJECT_DIR, Project, resolve_project
+from .output import PREVIEW_FILENAME, write_layer, write_preview
+from .preview import composite
+from .project import PROJECT_DIR, RUN_SIGNATURE, Project, prepare_output, resolve_project
+from .report import layer_stats, write_run_json
 from .separation import separate
 
 
@@ -232,23 +235,75 @@ def run(args: argparse.Namespace) -> int:
     if args.dry_run:
         return 0
 
+    if args.out is not None:
+        raise NotImplementedYet(
+            "`--out` n'est pas encore là (lot 8, voir doc/plan.md). La sortie "
+            "va dans le dossier `output/` du projet."
+        )
+    if args.preview_halftoned:
+        raise NotImplementedYet(
+            "`--preview-halftoned` attend le tramage (lot 7, voir doc/plan.md)."
+        )
+
     print("\nTraitement…")
     img = load_linear(project.source)
     img = resize_to(
         img, target_long_edge_px(profile.output.long_edge_mm, profile.output.dpi)
     )
     img = apply_tone(img, profile.tone)
+    output_px = (img.shape[1], img.shape[0])
     if args.verbose:
-        print(f"  image      : {img.shape[1]} × {img.shape[0]} px")
+        print(f"  image      : {output_px[0]} × {output_px[1]} px")
 
     coverage, ink_stats = separate(img, profile)
+    del img  # 440 Mo sur un A4 à 600 dpi, dont l'aperçu n'a plus besoin
+
     print(render_coverage(profile, coverage, ink_stats))
 
-    raise NotImplementedYet(
-        "L'écriture des calques n'est pas encore là (lots 4 et 5, voir "
-        "doc/plan.md).\nLa séparation, elle, a abouti : les couvertures "
-        "ci-dessus sont celles qui partiraient en machine."
+    if profile.halftone.method != "none":
+        warnings.append(
+            f"tramage {profile.halftone.method!r} demandé mais pas encore écrit "
+            "(lot 7) : les calques sortent en ton continu, à tramer par le "
+            "pilote de la machine."
+        )
+
+    output_dir = prepare_output(project)
+    written = []
+
+    preview_path = output_dir / PREVIEW_FILENAME
+    write_preview(composite(coverage, profile), preview_path, profile.output)
+    written.append(preview_path)
+
+    layers = layer_stats(profile, coverage)
+    if not args.preview_only:
+        for index, ink in enumerate(profile.inks):
+            path = output_dir / layers[index].file
+            write_layer(coverage[index], path, profile.output)
+            written.append(path)
+
+    write_run_json(
+        output_dir / RUN_SIGNATURE,
+        project=project,
+        profile=profile,
+        layers=layers,
+        source_px=source_px,
+        output_px=output_px,
+        ink_stats=ink_stats,
+        warnings=warnings,
     )
+
+    print(f"\nÉcrit dans {output_dir}/ :")
+    for path in sorted(written):
+        print(f"  {path.name}")
+    if args.preview_only:
+        print("  (--preview-only : calques non produits)")
+
+    if warnings:
+        print(f"\nAvertissements ({len(warnings)}) :")
+        for warning in warnings:
+            print(f"  ! {warning}")
+
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:

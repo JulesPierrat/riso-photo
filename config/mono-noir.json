@@ -10,7 +10,7 @@
       "order": 1,
       "opacity": 1.0,
       "screen_angle": 45,
-      "max_coverage": 0.9
+      "max_coverage": 1.0
     }
   ],
 
@@ -21,7 +21,7 @@
 
   "separation": {
     "method": "luminance",
-    "total_ink_limit": 0.9,
+    "total_ink_limit": 1.0,
     "preserve_highlights": true
   },
 

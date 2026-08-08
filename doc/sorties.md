@@ -103,6 +103,8 @@ Trace exhaustive du run : profil effectivement appliqué après valeurs par déf
 
 Deux usages : reproduire à l'identique un tirage réussi plusieurs mois plus tard, et servir de signature du dossier — sa présence indique que `output/` a bien été produit par le programme et peut être écrasé sans risque.
 
+Les couleurs y repartent en hexadécimal, telles qu'écrites dans le profil : ce sont elles qu'on recopiera pour refaire le tirage.
+
 ---
 
 ## `todo.md`

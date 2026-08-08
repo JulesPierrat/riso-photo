@@ -36,10 +36,12 @@ def profile_data() -> dict:
 @pytest.fixture
 def workspace(tmp_path: Path, profile_data: dict) -> Path:
     """Arborescence complète `config/` + `project/demo/`, prête à l'emploi."""
+    # Format volontairement minuscule : les tests CLI font tourner le pipeline
+    # complet, et un A4 à 600 dpi représenterait 37 Mpx par test.
+    small = {**profile_data, "output": {**profile_data["output"], "long_edge_mm": 12}}
+
     (tmp_path / "config").mkdir()
-    (tmp_path / "config" / "test.json").write_text(
-        json.dumps(profile_data), encoding="utf-8"
-    )
+    (tmp_path / "config" / "test.json").write_text(json.dumps(small), encoding="utf-8")
 
     demo = tmp_path / "project" / "demo"
     demo.mkdir(parents=True)

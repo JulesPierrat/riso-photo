@@ -42,15 +42,67 @@ def test_profil_invalide(workspace, monkeypatch, capsys):
     assert "color" in err
 
 
-def test_ecriture_pas_encore_ecrite(workspace, monkeypatch, capsys):
-    """Un lot non terminé s'arrête sur un message explicite, pas un plantage."""
-    assert run(["demo", "-c", "test"], workspace, monkeypatch) == 3
+def test_run_complet(workspace, monkeypatch, capsys):
+    assert run(["demo", "-c", "test"], workspace, monkeypatch) == 0
 
-    captured = capsys.readouterr()
-    assert "pas encore là" in captured.err
-    # La séparation, elle, a bien abouti.
-    assert "Couvertures :" in captured.out
-    assert "Encrage total" in captured.out
+    produced = {p.name for p in (workspace / "project" / "demo" / "output").iterdir()}
+    assert produced == {"01_pink.png", "02_black.png", "preview.png", "run.json"}
+
+    out = capsys.readouterr().out
+    assert "Couvertures :" in out
+    assert "Encrage total" in out
+
+
+def test_second_run_ecrase_le_premier(workspace, monkeypatch):
+    """La signature `run.json` autorise l'écrasement sans question."""
+    output = workspace / "project" / "demo" / "output"
+
+    run(["demo", "-c", "test"], workspace, monkeypatch)
+    (output / "trace.txt").write_text("reliquat", encoding="utf-8")
+
+    assert run(["demo", "-c", "test"], workspace, monkeypatch) == 0
+    assert not (output / "trace.txt").exists()
+
+
+def test_run_refuse_decraser_un_dossier_etranger(workspace, monkeypatch, capsys):
+    output = workspace / "project" / "demo" / "output"
+    output.mkdir()
+    (output / "retouche.psd").write_bytes(b"")
+
+    assert run(["demo", "-c", "test"], workspace, monkeypatch) == 1
+    assert (output / "retouche.psd").exists()
+    assert "run.json" in capsys.readouterr().err
+
+
+def test_preview_only_ne_produit_pas_les_calques(workspace, monkeypatch):
+    assert run(["demo", "-c", "test", "--preview-only"], workspace, monkeypatch) == 0
+
+    produced = {p.name for p in (workspace / "project" / "demo" / "output").iterdir()}
+    assert produced == {"preview.png", "run.json"}
+
+
+def test_run_json_reproduit_le_profil(workspace, monkeypatch):
+    run(["demo", "-c", "test", "--dpi", "150"], workspace, monkeypatch)
+
+    payload = json.loads(
+        (workspace / "project" / "demo" / "output" / "run.json").read_text(encoding="utf-8")
+    )
+    assert payload["project"] == "demo"
+    assert payload["profile"]["output"]["dpi"] == 150
+    assert payload["profile"]["inks"][0]["color"] == "#FF48B0"
+    assert [layer["file"] for layer in payload["layers"]] == ["01_pink.png", "02_black.png"]
+    assert payload["total_ink_max"] <= 1.7 + 1e-6
+
+
+def test_avertissement_de_tramage_manquant(workspace, monkeypatch, capsys):
+    run(["demo", "-c", "test"], workspace, monkeypatch)
+    assert "ton continu" in capsys.readouterr().out
+
+
+def test_out_pas_encore_ecrit(workspace, monkeypatch, capsys):
+    """Un lot non terminé s'arrête sur un message explicite, pas un plantage."""
+    assert run(["demo", "-c", "test", "--out", "ailleurs"], workspace, monkeypatch) == 3
+    assert "lot 8" in capsys.readouterr().err
 
 
 def test_surcharge_dpi_visible_dans_le_resume(workspace, monkeypatch, capsys):
