@@ -1,7 +1,6 @@
 {
   "name": "Quadrichromie riso",
-  "description": "Quatre passages sur papier blanc 170g. Jeu d'encres proche du CMJN, ce qui rend la méthode `cmyk` pertinente — sur des encres arbitraires, préférer `density-lsq`.",
-
+  "description": "Quatre passages sur papier blanc 170g. Le jeu est proche du CMJN, mais `density-lsq` tient mieux les noirs que la méthode `cmyk` : celle-ci suppose des encres idéales et rend laiteux avec des encres réelles.",
   "inks": [
     {
       "name": "yellow",
@@ -40,32 +39,27 @@
       "max_coverage": 1.0
     }
   ],
-
   "paper": {
     "color": "#FFFFFF",
     "label": "Blanc 170g non couché"
   },
-
   "separation": {
-    "method": "cmyk",
+    "method": "density-lsq",
     "total_ink_limit": 2.4,
-    "black_generation": 0.6,
+    "black_generation": 0.3,
     "preserve_highlights": true
   },
-
   "tone": {
     "gamma": 1.0,
     "contrast": 0.1,
     "black_point": 0.01,
     "white_point": 0.99
   },
-
   "halftone": {
     "method": "clustered-dot",
     "lpi": 60,
     "dot_shape": "round"
   },
-
   "output": {
     "dpi": 600,
     "format": "png",
