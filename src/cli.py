@@ -14,8 +14,16 @@ from pathlib import Path
 from . import __version__
 from .config import CONFIG_DIR, Profile, load_profile
 from .errors import NotImplementedYet, RisoError
-from .image import resolution_warning, source_size, target_long_edge_px
+from .image import (
+    apply_tone,
+    load_linear,
+    resize_to,
+    resolution_warning,
+    source_size,
+    target_long_edge_px,
+)
 from .project import PROJECT_DIR, Project, resolve_project
+from .separation import separate
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -164,6 +172,37 @@ def render_summary(
     return "\n".join(lines)
 
 
+def render_coverage(profile: Profile, coverage, stats: dict) -> str:
+    """Encrage mesuré, une ligne par passage.
+
+    C'est ce qui permet de juger une séparation sans ouvrir les fichiers : une
+    encre à 5 % de couverture moyenne ne justifie pas un passage machine.
+    """
+    limit = profile.separation.total_ink_limit
+    lines = ["", "Couvertures :"]
+
+    for index, ink in enumerate(profile.inks):
+        layer = coverage[index]
+        lines.append(
+            f"  {ink.order}. {ink.label:<20} moyenne {float(layer.mean()) * 100:5.1f} %"
+            f"   maximum {float(layer.max()) * 100:5.1f} %"
+        )
+
+    verdict = "✅" if stats["total_ink_max"] <= limit + 1e-3 else "⚠️"
+    lines.append(
+        f"  Encrage total : maximum {stats['total_ink_max'] * 100:.0f} %, "
+        f"moyenne {stats['total_ink_mean'] * 100:.0f} % "
+        f"(limite {limit * 100:.0f} %) {verdict}"
+    )
+    if stats["limited_fraction"] > 0.0:
+        lines.append(
+            f"  La limite a mordu sur {stats['limited_fraction'] * 100:.1f} % "
+            "des pixels, redistribués vers l'encre la plus foncée."
+        )
+
+    return "\n".join(lines)
+
+
 def run(args: argparse.Namespace) -> int:
     project = resolve_project(args.project)
     profile = load_profile(
@@ -193,10 +232,22 @@ def run(args: argparse.Namespace) -> int:
     if args.dry_run:
         return 0
 
+    print("\nTraitement…")
+    img = load_linear(project.source)
+    img = resize_to(
+        img, target_long_edge_px(profile.output.long_edge_mm, profile.output.dpi)
+    )
+    img = apply_tone(img, profile.tone)
+    if args.verbose:
+        print(f"  image      : {img.shape[1]} × {img.shape[0]} px")
+
+    coverage, ink_stats = separate(img, profile)
+    print(render_coverage(profile, coverage, ink_stats))
+
     raise NotImplementedYet(
-        "La séparation n'est pas encore écrite (lots 3 à 5, voir doc/plan.md).\n"
-        "Le projet, le profil et la source sont valides : `--dry-run` affiche "
-        "le plan complet."
+        "L'écriture des calques n'est pas encore là (lots 4 et 5, voir "
+        "doc/plan.md).\nLa séparation, elle, a abouti : les couvertures "
+        "ci-dessus sont celles qui partiraient en machine."
     )
 
 

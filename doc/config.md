@@ -127,7 +127,7 @@ La simulation part de la couleur du papier, pas du blanc pur. Sur un crème, un 
 | `method` | enum | `density-lsq` | `luminance`, `duotone`, `tritone`, `cmyk`, `density-lsq`. Voir [separation.md](separation.md). |
 | `total_ink_limit` | float ≥ 0 | `2.4` | Somme maximale des couvertures, tous calques confondus. `1.7` = 170 %. |
 | `black_generation` | 0.0–1.0 | `0.5` | Quantité de gris remplacée par l'encre la plus foncée. Utilisé par `cmyk` et `density-lsq`. |
-| `preserve_highlights` | bool | `true` | Force la couverture à zéro sous un seuil bas, pour garder des blancs francs. |
+| `preserve_highlights` | bool | `true` | Force la couverture à zéro sous 2 %, pour garder des blancs francs. |
 | `curves` | objet | `null` | Courbes de réponse explicites par encre. Requis pour `duotone` / `tritone`, ignoré ailleurs. |
 
 ### `total_ink_limit`

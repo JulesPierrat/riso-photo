@@ -19,7 +19,7 @@ from typing import Any
 
 import numpy as np
 
-from .color import ColorError, hex_to_linear, parse_hex
+from .color import LUMA_COEFFS, ColorError, hex_to_linear, parse_hex
 from .errors import ProfileError, UsageError
 
 CONFIG_DIR = Path("config")
@@ -129,9 +129,10 @@ class Profile:
         """L'encre la plus dense, celle qui porte le contraste.
 
         Sert de destination à la redistribution d'encrage et à la génération
-        du noir.
+        du noir. Départagée sur la luminance perçue et non sur la moyenne des
+        canaux : un bleu soutenu est plus foncé qu'un jaune de même moyenne.
         """
-        return min(self.inks, key=lambda i: float(np.mean(i.color)))
+        return min(self.inks, key=lambda i: float(np.dot(i.color, LUMA_COEFFS)))
 
 
 # --------------------------------------------------------------------------

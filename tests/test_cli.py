@@ -42,10 +42,15 @@ def test_profil_invalide(workspace, monkeypatch, capsys):
     assert "color" in err
 
 
-def test_pipeline_pas_encore_ecrit(workspace, monkeypatch, capsys):
+def test_ecriture_pas_encore_ecrite(workspace, monkeypatch, capsys):
     """Un lot non terminé s'arrête sur un message explicite, pas un plantage."""
     assert run(["demo", "-c", "test"], workspace, monkeypatch) == 3
-    assert "pas encore écrit" in capsys.readouterr().err
+
+    captured = capsys.readouterr()
+    assert "pas encore là" in captured.err
+    # La séparation, elle, a bien abouti.
+    assert "Couvertures :" in captured.out
+    assert "Encrage total" in captured.out
 
 
 def test_surcharge_dpi_visible_dans_le_resume(workspace, monkeypatch, capsys):

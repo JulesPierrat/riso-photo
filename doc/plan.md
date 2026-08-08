@@ -105,21 +105,23 @@ def apply_tone(img: np.ndarray, cfg: ToneCfg) -> np.ndarray
 ### `src/inks.py`
 
 ```python
+def transmittance(ink: Ink) -> np.ndarray            # (3,) filtrage d'un aplat 100 %
 def to_density(linear: np.ndarray, floor: float = 1e-4) -> np.ndarray
 def from_density(d: np.ndarray) -> np.ndarray
 def ink_density(ink: Ink) -> np.ndarray              # (3,)
 def density_matrix(inks: Sequence[Ink]) -> np.ndarray # (3, N)
+def luminance_density(inks: Sequence[Ink]) -> np.ndarray  # (N,) densité perçue
 ```
 
 ### `src/separation.py`
 
 ```python
-def separate(img: np.ndarray, profile: Profile) -> np.ndarray   # (N, H, W)
+def separate(img: np.ndarray, profile: Profile) -> tuple[np.ndarray, dict]  # (N, H, W)
 def apply_curve(x: np.ndarray, points: list[list[float]]) -> np.ndarray
 def limit_ink(cov: np.ndarray, profile: Profile) -> tuple[np.ndarray, dict]
 ```
 
-`separate` dispatche sur `profile.separation.method` et applique `limit_ink` en fin de course. Le `dict` retourné par `limit_ink` porte les statistiques d'encrage destinées au rapport.
+`separate` dispatche sur `profile.separation.method` et applique `limit_ink` en fin de course. Le `dict` porte les statistiques d'encrage (`total_ink_max`, `total_ink_mean`, `limited_fraction`) destinées au rapport : elles ne sont connues qu'ici et seraient impossibles à recalculer ensuite — d'où le tuple, là où le contrat initial ne rendait que le tableau.
 
 ### `src/halftone.py`
 
@@ -233,9 +235,9 @@ Deux étapes passent par une table de correspondance plutôt que par un calcul p
 
 `limit_ink` est implémenté dès ce lot avec sa redistribution vers l'encre la plus foncée, décrite dans [separation.md](separation.md).
 
-Les méthodes `cmyk`, `tritone` et `density-lsq` lèvent une erreur explicite « non implémentée ».
+`tritone`, prévu au lot 8, arrive ici : il partage intégralement le code de `duotone` — une courbe de réponse par encre — et ne coûte que le test. Restent `cmyk` et `density-lsq`, qui lèvent une erreur explicite « non implémentée ».
 
-**Fin de lot** — une image de test donne `N` cartes de couverture dans `[0, 1]`, aux bonnes dimensions, dont la somme respecte `total_ink_limit`.
+**Fin de lot** — une image de test donne `N` cartes de couverture dans `[0, 1]`, aux bonnes dimensions, dont la somme respecte `total_ink_limit`. La méthode `luminance` inverse effectivement le modèle : réappliquer la surimpression au calque redonne la luminance de la source.
 
 ---
 
@@ -315,7 +317,7 @@ Les trois méthodes de [halftone.md](halftone.md), `check_angles`, l'avertisseme
 | **Dépend de** | Lot 7 |
 | **Taille** | ~250 lignes |
 
-Marges et repères de calage, méthodes `cmyk` et `tritone`, options CLI restantes (`--out`, `--preview-halftoned`).
+Marges et repères de calage, méthode `cmyk`, options CLI restantes (`--out`, `--preview-halftoned`).
 
 **Fin de lot** — les repères tombent au pixel près à la même position sur tous les calques. C'est le seul critère qui compte : un décalage d'un pixel entre deux calques rend les repères inutilisables pour caler la machine.
 

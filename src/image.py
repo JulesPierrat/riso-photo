@@ -21,14 +21,11 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageOps
 
-from .color import linear_to_srgb, srgb_to_linear
+from .color import LUMA_COEFFS, linear_to_srgb, srgb_to_linear
 from .config import ToneCfg
 from .errors import RisoError
 
 MM_PER_INCH = 25.4
-
-#: Rec. 709, appliqués à la lumière linéaire.
-LUMA_COEFFS = np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
 
 #: Orientations EXIF qui échangent largeur et hauteur.
 _EXIF_ORIENTATION_TAG = 274

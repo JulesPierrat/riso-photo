@@ -21,6 +21,10 @@ _HEX_RE = re.compile(r"^#?([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$")
 _SRGB_THRESHOLD = 0.04045
 _LINEAR_THRESHOLD = 0.0031308
 
+#: Rec. 709, appliqués à la lumière linéaire. Ici plutôt que dans `image`,
+#: parce que `config` en a besoin pour désigner l'encre la plus foncée.
+LUMA_COEFFS = np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
+
 
 class ColorError(ValueError):
     """Couleur mal formée."""

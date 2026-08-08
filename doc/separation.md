@@ -52,7 +52,17 @@ En pratique on borne les valeurs linéaires par le bas (typiquement `1e-4`) avan
 
 ### `luminance` — 1 encre
 
-Conversion en luminance perceptuelle, puis courbe de réponse. La couverture est simplement `1 − L`. Sans surprise et sans réglage, mais c'est la référence pour juger si un duotone apporte vraiment quelque chose.
+Inversion directe du modèle de surimpression. Le rendu d'une couverture `a` vaut `Papier × (1 − a·(1 − T))`, où `T` est la transmittance de l'aplat ; on résout en luminance :
+
+```
+a = (1 − Y_cible / Y_papier) / (1 − T_Y)
+```
+
+Ce n'est **pas** `1 − luminance perceptuelle`, qui serait le réflexe naturel : sur un gris moyen, cette formule donnerait 50 % de couverture là où le modèle en réclame près de 80 %, et le tirage sortirait très délavé. Surtout, l'aperçu cesserait de correspondre au calque, puisqu'il applique le même modèle dans l'autre sens.
+
+La formule tient compte de la couleur du papier et de celle de l'encre : sur crème, un blanc de la photo reste du papier nu ; avec une encre claire, `1 − T_Y` est petit et la couverture sature vite — une encre jaune ne peut pas produire d'ombres, et le calcul le reflète.
+
+Sans réglage, mais c'est la référence pour juger si un duotone apporte vraiment quelque chose.
 
 ### `duotone` / `tritone` — 2 à 3 encres, par plages tonales
 
@@ -95,7 +105,17 @@ Le calcul se vectorise sur toute l'image plutôt que pixel par pixel — sans qu
 Deux plafonds, appliqués après la séparation :
 
 1. **`max_coverage` par encre** — écrêtage simple de chaque carte.
-2. **`total_ink_limit` sur la somme** — quand `Σ aᵢ` dépasse la limite, on ne coupe pas brutalement, ce qui produirait des aplats plats et des cassures visibles dans les ombres. On réduit progressivement les encres claires en compensant par l'encre la plus foncée, qui apporte le plus de densité par unité de couverture. La densité perçue est ainsi à peu près conservée alors que l'encrage total redescend.
+2. **`total_ink_limit` sur la somme** — quand `Σ aᵢ` dépasse la limite, on ne coupe pas brutalement, ce qui produirait des aplats plats et des cassures visibles dans les ombres. On réduit les encres claires d'un facteur `f` et on compense par l'encre la plus foncée, qui apporte le plus de densité par unité de couverture. La densité perçue est à peu près conservée alors que l'encrage total redescend.
+
+En notant `D` les densités perçues, `S` la somme des couvertures claires et `c = Σ aⱼ·Dⱼ / D_foncée` leur équivalent en encre foncée, `f` est la solution de `f·S + a_foncée + (1 − f)·c = limite`, soit :
+
+```
+f = (limite − a_foncée − c) / (S − c)
+```
+
+Deux cas dégénérés retombent sur une réduction uniforme de tous les calques : des encres de densités trop proches, où le transfert ne gagne rien (`S ≈ c`), et une limite plus basse que la couverture de l'encre foncée seule, où il n'y a rien à reporter. L'invariant `Σ aᵢ ≤ limite`, lui, est garanti dans tous les cas.
+
+Le seuil de `preserve_highlights` est fixé à 2 % de couverture : en dessous, une trame ne dépose qu'un point isolé par cellule, qui salit les blancs sans apporter de nuance.
 
 La couverture réellement atteinte, moyenne et maximale, est mesurée et reportée dans le `todo.md` — pour vérifier avant impression que le plafond n'a pas été atteint sur une portion significative de l'image.
 
