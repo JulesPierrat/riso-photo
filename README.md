@@ -131,4 +131,5 @@ La spécification technique complète est dans [`doc/`](doc/README.md) :
 | [separation.md](doc/separation.md) | Modèle colorimétrique et méthodes de séparation. |
 | [halftone.md](doc/halftone.md) | Tramage, linéature, angles, moiré. |
 | [sorties.md](doc/sorties.md) | Fichiers produits et conventions. |
-| [roadmap.md](doc/roadmap.md) | État d'avancement. |
+| [plan.md](doc/plan.md) | Plan d'implémentation : contrats, lots, tests, risques. |
+| [roadmap.md](doc/roadmap.md) | État d'avancement et jalons. |
