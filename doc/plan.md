@@ -282,14 +282,16 @@ Le `todo.md` est rendu à partir des statistiques réelles du run, selon la spé
 | **Dépend de** | Lot 5 et un tirage d'essai |
 | **Taille** | ~150 lignes |
 
-Le module techniquement le plus délicat. Moindres carrés bornés sur `M · a = D_cible − D_papier`, via `scipy.optimize.lsq_linear`, avec repli sur un solveur par projection quand SciPy est absent.
+Le module techniquement le plus délicat. Moindres carrés bornés sur `M · a = D_cible − D_papier`.
 
 Deux exigences non négociables :
 
-- **Vectorisation.** Le solveur tourne sur tous les pixels d'un coup, jamais dans une boucle Python. Une photo de 8 mégapixels traitée pixel par pixel prendrait des heures. Si `lsq_linear` ne se vectorise pas naturellement, résoudre par blocs de pixels regroupés.
+- **Vectorisation.** Le solveur tourne sur tous les pixels d'un coup, jamais dans une boucle Python. Une photo de 8 mégapixels traitée pixel par pixel prendrait des heures.
 - **Pondération perceptuelle** par canal, sans quoi les erreurs dans le bleu pèsent autant que dans le vert.
 
-**Fin de lot** — sur un jeu d'encres proche du CMJ, `density-lsq` reproduit une mire de couleurs avec une erreur moyenne inférieure à celle de `duotone`. Temps de traitement sous 30 s pour 8 mégapixels. Résultats identiques avec et sans SciPy à `2e-2` près.
+Le plan prévoyait `scipy.optimize.lsq_linear` avec repli intégré. Ce contrat est infaisable : `lsq_linear` traite **un** problème à la fois et ne se vectorise pas. La solution retenue — énumération des 3^N jeux de contraintes actives, exacte et entièrement vectorisée — est décrite dans [separation.md](separation.md). SciPy passe du chemin critique aux tests, où il sert de référence indépendante : un contrôle plus sévère qu'un repli, puisqu'il vérifie l'optimalité et pas seulement l'absence de plantage. SciPy n'est donc plus une dépendance d'exécution.
+
+**Fin de lot** — sur un jeu d'encres proche du CMJ, `density-lsq` reproduit une mire de couleurs avec une erreur moyenne inférieure à celle de `duotone`. Temps de traitement sous 30 s pour 8 mégapixels. Le solveur ne fait jamais moins bien que `scipy.optimize.lsq_linear` sur des systèmes tirés au hasard.
 
 ---
 

@@ -9,11 +9,14 @@ from __future__ import annotations
 
 import numpy as np
 
+import itertools
+from dataclasses import dataclass
+
 from .color import LUMA_COEFFS
 from .config import Profile
-from .errors import NotImplementedYet
+from .errors import NotImplementedYet, ProfileError
 from .image import luminance, relative_luminance
-from .inks import luminance_density, transmittance
+from .inks import density_matrix, luminance_density, to_density, transmittance
 
 #: Couverture en deçà de laquelle `preserve_highlights` remet à zéro. Sous 2 %,
 #: une trame ne dépose qu'un point isolé par cellule : il salit les blancs sans
@@ -25,7 +28,40 @@ HIGHLIGHT_FLOOR = 0.02
 #: toute pente raisonnable.
 _CURVE_LUT_SIZE = 8192
 
-_IMPLEMENTED = ("luminance", "duotone", "tritone")
+_IMPLEMENTED = ("luminance", "duotone", "tritone", "density-lsq")
+
+#: Pondération des canaux dans l'erreur de séparation. À mi-chemin entre un
+#: traitement uniforme et la sensibilité de l'œil : une erreur dans le vert se
+#: voit davantage qu'une erreur dans le bleu, mais pondérer strictement par la
+#: luminance donnerait au bleu dix fois moins de poids qu'au vert et
+#: dégraderait franchement les ciels.
+_CHANNEL_WEIGHTS = np.sqrt(0.5 + 0.5 * 3.0 * LUMA_COEFFS).astype(np.float32)
+
+#: Taille des blocs de pixels traités d'un coup par le solveur. Borne la
+#: pointe mémoire indépendamment des dimensions de l'image.
+_SOLVER_CHUNK = 2_000_000
+
+#: Au-delà, l'énumération des jeux de contraintes (3^N) devient déraisonnable.
+#: Un travail riso dépasse rarement quatre passages.
+_MAX_INKS_LSQ = 5
+
+_FREE, _AT_ZERO, _AT_CAP = 0, 1, 2
+
+
+@dataclass(frozen=True)
+class _ActiveSet:
+    """Une répartition des encres entre libres, à zéro et au plafond.
+
+    Tout y est précalculé et indépendant des pixels : c'est ce qui ramène la
+    résolution à quelques produits matriciels par répartition.
+    """
+
+    free: tuple[int, ...]
+    capped: tuple[int, ...]
+    offset: np.ndarray | None  # (m,) contribution des encres au plafond
+    pinv: np.ndarray | None  # (|F|, m) résolution des encres libres
+    residual_form: np.ndarray  # (m, m) projecteur du résidu, symétrique
+    free_caps: np.ndarray
 
 
 def apply_curve(x: np.ndarray, points) -> np.ndarray:
@@ -87,6 +123,233 @@ def _separate_tonal(img: np.ndarray, profile: Profile) -> np.ndarray:
     curves = profile.separation.curves or {}
     lum = luminance(img)
     return np.stack([apply_curve(lum, curves[ink.name]) for ink in profile.inks])
+
+
+# --------------------------------------------------------------------------
+# Séparation générale : moindres carrés bornés en espace densité
+
+
+def build_system(profile: Profile) -> tuple[np.ndarray, np.ndarray]:
+    """Matrice pondérée du système et plafonds, pour `density-lsq`.
+
+    Le système est `M · a = D_cible − D_papier`, où la colonne `i` de `M` est
+    la densité de l'encre `i`. Les lignes sont pondérées par canal.
+
+    Avec quatre encres ou plus, il y a plus d'inconnues que d'équations :
+    plusieurs combinaisons donnent la même couleur. `black_generation` ajoute
+    alors une pénalité sur les encres claires, ce qui pousse le solveur à
+    fabriquer les zones neutres avec l'encre la plus foncée — moins d'encre au
+    total, meilleur séchage, repérage moins critique dans les ombres.
+    """
+    inks = profile.inks
+    weighted = _CHANNEL_WEIGHTS[:, np.newaxis] * density_matrix(inks)
+    caps = np.array([ink.max_coverage for ink in inks], dtype=np.float32)
+
+    rows = [weighted]
+
+    if len(inks) > 3 and profile.separation.black_generation > 0.0:
+        scale = float(np.mean(np.sum(weighted**2, axis=0)))
+        darkest = int(np.argmax(luminance_density(inks)))
+        light = [i for i in range(len(inks)) if i != darkest]
+        penalty = np.zeros((len(light), len(inks)), dtype=np.float32)
+        penalty[np.arange(len(light)), light] = np.sqrt(
+            profile.separation.black_generation * scale
+        )
+        rows.append(penalty)
+
+    return np.vstack(rows).astype(np.float32), caps
+
+
+def build_active_sets(matrix: np.ndarray, caps: np.ndarray) -> list[_ActiveSet]:
+    """Précalcule les 3^N répartitions. Ne dépend que du profil, jamais des pixels.
+
+    `residual_form` est `I − P`, où `P` projette orthogonalement sur l'espace
+    engendré par les encres libres. Le résidu d'un pixel vaut alors la forme
+    quadratique `tᵀ(I − P)t`, ce qui évite de reconstruire la solution complète
+    pour chaque répartition simplement afin de la comparer aux autres.
+    """
+    count = matrix.shape[1]
+    rows = matrix.shape[0]
+    identity = np.eye(rows, dtype=np.float32)
+    sets: list[_ActiveSet] = []
+
+    for pattern in itertools.product((_FREE, _AT_ZERO, _AT_CAP), repeat=count):
+        free = tuple(i for i, state in enumerate(pattern) if state == _FREE)
+        capped = tuple(i for i, state in enumerate(pattern) if state == _AT_CAP)
+
+        if free:
+            columns = matrix[:, free]
+            pinv = np.linalg.pinv(columns).astype(np.float32)
+            residual_form = identity - columns @ pinv
+        else:
+            pinv = None
+            residual_form = identity
+
+        sets.append(
+            _ActiveSet(
+                free=free,
+                capped=capped,
+                offset=(
+                    (matrix[:, capped] @ caps[list(capped)]).astype(np.float32)
+                    if capped
+                    else None
+                ),
+                pinv=pinv,
+                residual_form=residual_form.astype(np.float32),
+                free_caps=caps[list(free)],
+            )
+        )
+
+    return sets
+
+
+def solve_bounded_lsq(
+    matrix: np.ndarray,
+    rhs: np.ndarray,
+    caps: np.ndarray,
+    tol: float = 1e-5,
+    active_sets: list[_ActiveSet] | None = None,
+) -> np.ndarray:
+    """Moindres carrés bornés `min ‖A·a − b‖²` sous `0 ≤ a ≤ caps`, vectorisé.
+
+    `rhs` est `(m, P)` : une colonne par pixel. Le résultat est `(N, P)`.
+
+    L'optimum d'un problème borné est atteint en fixant un sous-ensemble des
+    variables à leurs bornes et en résolvant librement le reste. Comme `N` est
+    petit, on énumère les 3^N répartitions possibles : chacune se ramène à une
+    application linéaire constante, donc à un produit matriciel sur tous les
+    pixels d'un coup. Parmi les candidats **réalisables**, celui de plus petit
+    résidu est l'optimum exact — un candidat réalisable est un point admissible
+    du problème d'origine, son coût majore donc l'optimum.
+
+    C'est ce qui permet de rester vectorisé. Un solveur généraliste comme
+    `scipy.optimize.lsq_linear` traite un problème à la fois : sur les 37 Mpx
+    d'un A4 à 600 dpi, il faudrait des heures. Les tests s'en servent en
+    revanche comme référence indépendante.
+    """
+    sets = build_active_sets(matrix, caps) if active_sets is None else active_sets
+
+    # `itertools.product` place `_FREE` en premier : la répartition 0 est celle
+    # où toutes les encres sont libres, donc la solution non contrainte. Elle
+    # suffit pour la plupart des pixels d'une photo — on ne paie l'énumération
+    # que sur les autres.
+    guess = (sets[0].pinv @ rhs).astype(np.float32)
+    inside = np.all((guess >= -tol) & (guess <= caps[:, np.newaxis] + tol), axis=0)
+
+    out = np.clip(guess, 0.0, caps[:, np.newaxis])
+    if inside.all():
+        return out
+
+    outside = np.flatnonzero(~inside)
+    out[:, outside] = _best_active_set(
+        sets, np.ascontiguousarray(rhs[:, outside]), caps, tol
+    )
+    return out
+
+
+def _best_active_set(
+    sets: list[_ActiveSet], rhs: np.ndarray, caps: np.ndarray, tol: float
+) -> np.ndarray:
+    """Retient, pour chaque pixel, la répartition réalisable de moindre résidu.
+
+    Deux passes. La première ne calcule que ce qui sert à départager — le
+    résidu et la réalisabilité — sans jamais matérialiser la solution complète
+    d'une répartition perdante. La seconde ne reconstruit que les gagnantes, ce
+    qui revient au coût d'une seule répartition étalée sur toute l'image.
+    """
+    pixels = rhs.shape[1]
+    count = caps.shape[0]
+
+    best_residual = np.full(pixels, np.inf, dtype=np.float32)
+    best_index = np.zeros(pixels, dtype=np.int16)
+
+    for index, active in enumerate(sets):
+        target = rhs if active.offset is None else rhs - active.offset[:, np.newaxis]
+
+        if active.free:
+            solved = active.pinv @ target
+            usable = np.all(
+                (solved >= -tol) & (solved <= active.free_caps[:, np.newaxis] + tol),
+                axis=0,
+            )
+            if not usable.any():
+                continue
+        else:
+            usable = None
+
+        residual = np.einsum("ip,ip->p", active.residual_form @ target, target)
+
+        better = residual < best_residual
+        if usable is not None:
+            better &= usable
+        best_residual = np.where(better, residual, best_residual)
+        best_index[better] = index
+
+    out = np.zeros((count, pixels), dtype=np.float32)
+    for index, active in enumerate(sets):
+        chosen = np.flatnonzero(best_index == index)
+        if chosen.size == 0:
+            continue
+
+        block = np.zeros((count, chosen.size), dtype=np.float32)
+        if active.capped:
+            block[list(active.capped)] = caps[list(active.capped)][:, np.newaxis]
+        if active.free:
+            target = rhs[:, chosen]
+            if active.offset is not None:
+                target = target - active.offset[:, np.newaxis]
+            block[list(active.free)] = active.pinv @ target
+        out[:, chosen] = block
+
+    return np.clip(out, 0.0, caps[:, np.newaxis])
+
+
+def _separate_density_lsq(img: np.ndarray, profile: Profile) -> np.ndarray:
+    """Séparation générale : n'importe quel jeu d'encres.
+
+    Le traitement se fait par blocs de lignes : sur un A4 à 600 dpi, matérialiser
+    d'un coup les densités cibles et tous les candidats du solveur dépasserait
+    plusieurs gigaoctets.
+    """
+    if len(profile.inks) > _MAX_INKS_LSQ:
+        raise ProfileError(
+            f"`density-lsq` gère jusqu'à {_MAX_INKS_LSQ} encres, le profil en "
+            f"déclare {len(profile.inks)}."
+        )
+
+    matrix, caps = build_system(profile)
+    active_sets = build_active_sets(matrix, caps)  # une fois, pas par bloc
+    paper_density = to_density(profile.paper.color) * _CHANNEL_WEIGHTS
+
+    # Densité maximale que le jeu d'encres sait produire, canal par canal.
+    # Au-delà, la cible est hors d'atteinte : la réclamer quand même fait
+    # courir le solveur après l'impossible et lui fait sacrifier les canaux
+    # qu'il aurait pu servir. Un rouge saturé demande une densité infinie en
+    # vert et en bleu — ramenée à 4.0 par le plancher, soit trois fois le
+    # maximum atteignable — et ressortait en gris-bleu parce que le solveur
+    # saturait l'encre bleue pour gratter ce résidu, tuant le rouge au passage.
+    reachable = (matrix[:3] @ caps)[:, np.newaxis]
+
+    height, width = img.shape[:2]
+    out = np.empty((len(profile.inks), height, width), dtype=np.float32)
+    rows = max(1, _SOLVER_CHUNK // width)
+
+    for start in range(0, height, rows):
+        stop = min(height, start + rows)
+        block = to_density(img[start:stop]) * _CHANNEL_WEIGHTS
+        block -= paper_density
+
+        rhs = np.ascontiguousarray(block.reshape(-1, 3).T)
+        np.minimum(rhs, reachable, out=rhs)
+
+        padding = matrix.shape[0] - 3
+        if padding:
+            rhs = np.vstack([rhs, np.zeros((padding, rhs.shape[1]), dtype=np.float32)])
+
+        solved = solve_bounded_lsq(matrix, rhs, caps, active_sets=active_sets)
+        out[:, start:stop] = solved.reshape(-1, stop - start, width)
+
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -194,6 +457,8 @@ def separate(img: np.ndarray, profile: Profile) -> tuple[np.ndarray, dict]:
 
     if method == "luminance":
         coverage = _separate_luminance(img, profile)
+    elif method == "density-lsq":
+        coverage = _separate_density_lsq(img, profile)
     else:
         coverage = _separate_tonal(img, profile)
 

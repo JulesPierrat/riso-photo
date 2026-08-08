@@ -10,7 +10,7 @@ Une risographe n'imprime qu'une encre à la fois : un visuel en trois couleurs, 
 
 Les encres sont libres : rose fluo, bleu, jaune, vert, noir — pas seulement du CMJN. C'est ce que permet la méthode de séparation par défaut, décrite dans [`doc/separation.md`](doc/separation.md).
 
-> **État du projet — v0.1.** La chaîne complète fonctionne : séparations `luminance`, `duotone` et `tritone`, aperçu, rapports. Les calques sortent en **ton continu** — le tramage arrive en v0.3, d'ici là c'est le pilote de la risographe qui tramera. Voir [`doc/roadmap.md`](doc/roadmap.md).
+> **État du projet — v0.1.** La chaîne complète fonctionne : séparations `luminance`, `duotone`, `tritone` et `density-lsq`, aperçu, rapports. Les calques sortent en **ton continu** — le tramage arrive en v0.3, d'ici là c'est le pilote de la risographe qui tramera. Voir [`doc/roadmap.md`](doc/roadmap.md).
 
 ---
 
@@ -28,7 +28,7 @@ source .venv/bin/activate        # Windows : .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Trois dépendances : `Pillow` (lecture/écriture image), `NumPy` (calcul pixel), `SciPy` (solveur de séparation). SciPy est optionnel — sans lui, le programme bascule sur un solveur interne un peu moins précis.
+Deux dépendances seulement : `Pillow` (lecture/écriture image) et `NumPy` (calcul pixel). Le solveur de séparation est intégré.
 
 Vérifier que tout répond :
 
@@ -65,7 +65,7 @@ Les profils vivent dans `config/`. Ils décrivent les encres, le papier et les r
 
 ```bash
 ls config/
-# duotone-rose-noir.json  mono-noir.json
+# duotone-rose-noir.json  mono-noir.json  trichro-cmj.json
 ```
 
 Prendre le plus proche du matériel disponible, quitte à l'adapter ensuite. Le champ le plus important est la couleur de chaque encre : la référence complète est dans [`doc/config.md`](doc/config.md).

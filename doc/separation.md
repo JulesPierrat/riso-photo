@@ -90,9 +90,21 @@ La méthode générale, celle qui justifie l'existence du programme : elle gère
 
 C'est un problème de moindres carrés à bornes, résolu par NNLS bornée. Le résultat `a` **est** directement le jeu de calques.
 
-**Implémentation.** SciPy fournit le solveur (`scipy.optimize.nnls` ou `lsq_linear`). En son absence, on retombe sur un solveur par projection intégré : moindres carrés non contraints, projection sur les bornes, quelques itérations de raffinement du résidu. Moins exact, suffisant en pratique.
+**Implémentation.** Un solveur généraliste comme `scipy.optimize.lsq_linear` traite un problème à la fois : sur les 37 Mpx d'un A4 à 600 dpi, il faudrait des heures. Le programme s'appuie donc sur une propriété du problème borné — **l'optimum s'obtient en fixant un sous-ensemble des variables à leurs bornes et en résolvant librement le reste**.
 
-Le calcul se vectorise sur toute l'image plutôt que pixel par pixel — sans quoi une photo de 8 mégapixels devient inexploitable.
+Comme le nombre d'encres est petit, on énumère les 3^N répartitions possibles (libre / à zéro / au plafond). Chacune se ramène à une application linéaire **constante**, donc à un produit matriciel sur tous les pixels d'un coup. Parmi les candidats réalisables, celui de plus petit résidu est l'optimum exact : un candidat réalisable est un point admissible du problème d'origine, son coût majore donc l'optimum.
+
+Trois optimisations font tenir le temps de calcul :
+
+- **La solution non contrainte d'abord.** Sur une photo, la majorité des pixels y tiennent déjà dans les bornes ; on ne paie l'énumération que sur les autres.
+- **Résidu par forme quadratique.** Comparer deux répartitions ne demande pas de reconstruire leur solution complète : le résidu vaut `tᵀ(I − P)t`, où `P` projette sur l'espace des encres libres et se précalcule.
+- **Reconstruction en seconde passe.** Seules les répartitions gagnantes sont développées, ce qui revient au coût d'une seule répartition étalée sur l'image.
+
+SciPy n'est donc pas utilisé à l'exécution — il sert de **référence indépendante dans les tests**, ce pour quoi sa lenteur n'a aucune importance. C'est un contrôle plus sévère qu'un repli : il vérifie que le solveur rend bien l'optimum, pas seulement qu'il tourne.
+
+Le traitement se fait par blocs de lignes, ce qui borne la mémoire indépendamment des dimensions de l'image.
+
+**Cible hors d'atteinte.** Un jeu d'encres a un gamut limité, et la densité d'un canal parfaitement saturé est infinie — ramenée à 4.0 par le plancher, souvent trois fois le maximum atteignable. Réclamer cette densité fait courir le solveur après l'impossible et lui fait sacrifier les canaux qu'il aurait pu servir : un rouge pur ressortait en gris-bleu, parce que saturer l'encre bleue grattait un peu de résidu dans le vert au prix du rouge. La densité cible est donc **plafonnée canal par canal à ce que les encres savent produire**, ce qui ne change rien aux couleurs atteignables et préserve la teinte des autres.
 
 **Pondération perceptuelle.** L'erreur est pondérée par canal pour se rapprocher de la sensibilité de l'œil, plutôt que de traiter R, V et B à égalité. Une erreur dans le vert se voit davantage qu'une erreur dans le bleu.
 

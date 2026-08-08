@@ -1,0 +1,69 @@
+{
+  "name": "Trichromie riso — jaune / rose fluo / bleu",
+  "description": "Trois passages, reproduction couleur sur papier blanc 170g. Le jeu d'encres n'est pas du CMJN : c'est `density-lsq` qui s'en accommode.",
+
+  "inks": [
+    {
+      "name": "yellow",
+      "label": "Yellow",
+      "color": "#FFE800",
+      "order": 1,
+      "opacity": 0.85,
+      "screen_angle": 15,
+      "max_coverage": 1.0
+    },
+    {
+      "name": "fluo-pink",
+      "label": "Fluorescent Pink",
+      "color": "#FF48B0",
+      "order": 2,
+      "opacity": 0.85,
+      "screen_angle": 75,
+      "max_coverage": 0.9
+    },
+    {
+      "name": "blue",
+      "label": "Blue",
+      "color": "#0078BF",
+      "order": 3,
+      "opacity": 0.85,
+      "screen_angle": 45,
+      "max_coverage": 1.0
+    }
+  ],
+
+  "paper": {
+    "color": "#FFFFFF",
+    "label": "Blanc 170g non couché"
+  },
+
+  "separation": {
+    "method": "density-lsq",
+    "total_ink_limit": 2.2,
+    "black_generation": 0.5,
+    "preserve_highlights": true
+  },
+
+  "tone": {
+    "gamma": 1.0,
+    "contrast": 0.1,
+    "black_point": 0.01,
+    "white_point": 0.99
+  },
+
+  "halftone": {
+    "method": "clustered-dot",
+    "lpi": 60,
+    "dot_shape": "round"
+  },
+
+  "output": {
+    "dpi": 600,
+    "format": "png",
+    "bit_depth": 8,
+    "invert": false,
+    "long_edge_mm": 297,
+    "registration_marks": true,
+    "margin_mm": 5
+  }
+}

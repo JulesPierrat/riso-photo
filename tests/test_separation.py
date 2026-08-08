@@ -3,12 +3,19 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from src.color import LUMA_COEFFS, srgb_to_linear
-from src.config import build_profile
-from src.errors import NotImplementedYet
+from src.color import LUMA_COEFFS, hex_to_linear, linear_to_srgb, srgb_to_linear
+from src.config import build_profile, load_profile
+from src.errors import NotImplementedYet, ProfileError
+from src.preview import composite
 from src.image import relative_luminance
 from src.inks import transmittance
-from src.separation import HIGHLIGHT_FLOOR, apply_curve, limit_ink, separate
+from src.separation import (
+    HIGHLIGHT_FLOOR,
+    apply_curve,
+    limit_ink,
+    separate,
+    solve_bounded_lsq,
+)
 
 
 def flat(value: float, size: int = 8) -> np.ndarray:
@@ -221,7 +228,7 @@ def test_tritone_accepte_trois_encres():
 # Méthodes non écrites
 
 
-@pytest.mark.parametrize("method", ["density-lsq", "cmyk"])
+@pytest.mark.parametrize("method", ["cmyk"])
 def test_methodes_non_ecrites(method):
     profile = build_profile(
         {
@@ -331,3 +338,205 @@ def test_limit_ink_avec_une_seule_encre():
     profile = mono_profile(total_ink_limit=0.5)
     limite, _ = limit_ink(np.ones((1, 4, 4), dtype=np.float32), profile)
     assert float(limite.max()) <= 0.5 + 1e-6
+
+
+# --------------------------------------------------------------------------
+# Solveur de moindres carrés bornés
+
+
+def test_solveur_respecte_les_bornes():
+    rng = np.random.default_rng(0)
+    matrix = rng.normal(size=(3, 3)).astype(np.float32)
+    caps = np.array([0.9, 0.7, 1.0], dtype=np.float32)
+    rhs = rng.normal(scale=3.0, size=(3, 500)).astype(np.float32)
+
+    solved = solve_bounded_lsq(matrix, rhs, caps)
+
+    assert solved.shape == (3, 500)
+    assert float(solved.min()) >= -1e-6
+    assert np.all(solved <= caps[:, None] + 1e-6)
+
+
+def test_solveur_exact_face_a_une_recherche_exhaustive():
+    """L'énumération des jeux actifs doit rendre l'optimum, pas une approximation."""
+    rng = np.random.default_rng(3)
+    matrix = rng.normal(size=(3, 2)).astype(np.float32)
+    caps = np.array([0.8, 0.6], dtype=np.float32)
+    rhs = rng.normal(scale=2.0, size=(3, 30)).astype(np.float32)
+
+    solved = solve_bounded_lsq(matrix, rhs, caps)
+
+    grid = np.stack(
+        np.meshgrid(np.linspace(0, caps[0], 120), np.linspace(0, caps[1], 120)),
+        axis=-1,
+    ).reshape(-1, 2)
+    brute = ((matrix @ grid.T)[:, :, None] - rhs[:, None, :]) ** 2
+    meilleur = brute.sum(axis=0).min(axis=0)
+
+    obtenu = np.sum((matrix @ solved - rhs) ** 2, axis=0)
+    assert np.all(obtenu <= meilleur + 1e-4)
+
+
+def test_solveur_sans_contrainte_active():
+    """Quand l'optimum libre tient dans les bornes, c'est lui la réponse."""
+    matrix = np.eye(3, dtype=np.float32)
+    caps = np.ones(3, dtype=np.float32)
+    rhs = np.array([[0.2], [0.5], [0.8]], dtype=np.float32)
+
+    assert np.allclose(solve_bounded_lsq(matrix, rhs, caps), rhs, atol=1e-6)
+
+
+def test_solveur_avec_encres_colineaires():
+    """Deux encres identiques rendent le système dégénéré : pas de plantage."""
+    matrix = np.array([[1.0, 1.0], [0.5, 0.5], [0.2, 0.2]], dtype=np.float32)
+    caps = np.ones(2, dtype=np.float32)
+    rhs = np.array([[1.0], [0.5], [0.2]], dtype=np.float32)
+
+    solved = solve_bounded_lsq(matrix, rhs, caps)
+    assert np.isfinite(solved).all()
+    assert float(np.sum((matrix @ solved - rhs) ** 2)) < 1e-4
+
+
+def test_decoupage_en_blocs_sans_effet(monkeypatch):
+    """Le découpage borne la mémoire ; il ne doit rien changer au résultat."""
+    profile = load_profile("trichro-cmj")
+    rng = np.random.default_rng(5)
+    img = rng.random((40, 40, 3), dtype=np.float32)
+
+    entier, _ = separate(img, profile)
+    monkeypatch.setattr("src.separation._SOLVER_CHUNK", 137)
+    morcele, _ = separate(img, profile)
+
+    assert np.allclose(entier, morcele, atol=1e-6)
+
+
+def test_trop_dencres_pour_lenumeration():
+    inks = [
+        {"name": f"e{i}", "color": c, "order": i + 1}
+        for i, c in enumerate(
+            ["#FFE800", "#FF48B0", "#0078BF", "#00A95C", "#FF6F61", "#231F20"]
+        )
+    ]
+    profile = build_profile(
+        {"name": "six", "inks": inks, "separation": {"method": "density-lsq"}}
+    )
+    with pytest.raises(ProfileError, match="jusqu'à 5 encres"):
+        separate(ramp(), profile)
+
+
+# --------------------------------------------------------------------------
+# Méthode `density-lsq`
+
+
+def trichro(**separation):
+    return load_profile(
+        "trichro-cmj", overrides={"separation": separation} if separation else None
+    )
+
+
+def test_density_lsq_forme_et_bornes():
+    profile = trichro()
+    coverage, _ = separate(ramp(), profile)
+
+    assert coverage.shape == (3, 1, 256)
+    assert coverage.dtype == np.float32
+    assert coverage.min() >= 0.0 and coverage.max() <= 1.0
+
+
+def test_density_lsq_papier_nu_sur_le_blanc():
+    coverage, _ = separate(flat(1.0), trichro())
+    assert float(coverage.max()) == pytest.approx(0.0, abs=1e-3)
+
+
+def test_density_lsq_reproduit_mieux_quun_duotone():
+    """Critère de fin du lot : la séparation générale doit valoir son coût."""
+    mire = np.stack(
+        [
+            hex_to_linear(c)
+            for c in ("#E8B89B", "#C68642", "#808080", "#4A7BA7", "#7BA05B", "#F5D76E")
+        ]
+    ).reshape(1, -1, 3)
+
+    duo = load_profile("duotone-rose-noir", overrides={"paper": {"color": "#FFFFFF"}})
+    ecarts = {}
+    for nom, profile in (("duotone", duo), ("density-lsq", trichro())):
+        coverage, _ = separate(mire, profile)
+        rendu = composite(coverage, profile)
+        ecarts[nom] = float(np.abs(linear_to_srgb(rendu) - linear_to_srgb(mire)).mean())
+
+    assert ecarts["density-lsq"] < ecarts["duotone"]
+    assert ecarts["density-lsq"] < 0.12
+
+
+def test_density_lsq_preserve_la_teinte_hors_gamut():
+    """Une cible inatteignable doit rester du bon côté de la roue.
+
+    Sans plafonnement de la densité cible, le solveur saturait l'encre bleue
+    pour gratter un résidu impossible et rendait un rouge pur en gris-bleu.
+    """
+    profile = trichro()
+    rouge = np.array([[[1.0, 0.0, 0.0]]], dtype=np.float32)
+
+    coverage, _ = separate(rouge, profile)
+    rendu = composite(coverage, profile)[0, 0]
+
+    assert float(rendu[0]) > float(rendu[1])
+    assert float(rendu[0]) > float(rendu[2])
+
+
+def test_density_lsq_tient_compte_du_papier():
+    creme = load_profile("trichro-cmj", overrides={"paper": {"color": "#F4EFE2"}})
+    coverage, _ = separate(flat(1.0), creme)
+    assert float(coverage.max()) == pytest.approx(0.0, abs=1e-3)
+
+
+def test_black_generation_favorise_lencre_foncee():
+    """Avec quatre encres le système est sous-déterminé : la pénalité tranche."""
+    quatre = {
+        "name": "quadri",
+        "inks": [
+            {"name": "yellow", "color": "#FFE800", "order": 1},
+            {"name": "pink", "color": "#FF48B0", "order": 2},
+            {"name": "blue", "color": "#0078BF", "order": 3},
+            {"name": "black", "color": "#231F20", "order": 4},
+        ],
+        "separation": {"method": "density-lsq", "total_ink_limit": 3.0},
+    }
+    gris = srgb_to_linear(np.full((1, 4, 3), 0.35, dtype=np.float32))
+
+    faible, _ = separate(gris, build_profile(
+        {**quatre, "separation": {**quatre["separation"], "black_generation": 0.0}}))
+    fort, _ = separate(gris, build_profile(
+        {**quatre, "separation": {**quatre["separation"], "black_generation": 1.0}}))
+
+    assert float(fort[3].mean()) > float(faible[3].mean())      # plus de noir
+    assert float(fort.sum(axis=0).mean()) < float(faible.sum(axis=0).mean())  # moins d'encre
+
+
+def test_solveur_conforme_a_scipy():
+    """Référence indépendante.
+
+    SciPy résout un problème à la fois — inutilisable sur des dizaines de
+    millions de pixels — mais c'est exactement ce qui en fait un bon juge.
+    L'import est local : sans SciPy, seul ce test est sauté.
+    """
+    scipy_optimize = pytest.importorskip("scipy.optimize", reason="SciPy absent")
+    rng = np.random.default_rng(7)
+    pire = 0.0
+
+    for _ in range(25):
+        count = int(rng.integers(2, 6))
+        matrix = rng.normal(size=(3, count)).astype(np.float32)
+        caps = rng.uniform(0.4, 1.0, size=count).astype(np.float32)
+        rhs = rng.normal(scale=2.0, size=(3, 40)).astype(np.float32)
+
+        mine = solve_bounded_lsq(matrix, rhs, caps)
+        for column in range(rhs.shape[1]):
+            reference = scipy_optimize.lsq_linear(
+                matrix, rhs[:, column], bounds=(0.0, caps), method="bvls"
+            ).x
+            cout = lambda a: float(np.sum((matrix @ a - rhs[:, column]) ** 2))  # noqa: E731
+            pire = max(pire, cout(mine[:, column]) - cout(reference))
+
+    # Notre solveur ne doit jamais faire moins bien que la référence.
+    assert pire < 1e-4

@@ -14,7 +14,7 @@ riso-photo/
 │   ├── project.py             # résolution du dossier projet, détection de la source
 │   ├── image.py               # chargement, colorimétrie, redimensionnement, courbes tonales
 │   ├── inks.py                # définition des encres, passage en espace densité
-│   ├── separation.py          # algorithmes de séparation
+│   ├── separation.py          # algorithmes de séparation, solveur borné
 │   ├── halftone.py            # tramage AM / FM / ordonné, angles
 │   ├── output.py              # écriture des fichiers, repères de calage
 │   ├── preview.py             # simulation de la surimpression
@@ -22,8 +22,7 @@ riso-photo/
 ├── config/                    # profils d'impression réutilisables
 │   ├── mono-noir.json
 │   ├── duotone-rose-noir.json
-│   ├── trichro-cmj.json
-│   └── quadri-riso.json
+│   └── trichro-cmj.json
 └── project/
     └── nom_projet/
         ├── source.jpg         # déposé par l'utilisateur — jamais modifié
@@ -43,7 +42,7 @@ riso-photo/
 | `project.py` | Localise `project/<nom>/`, identifie l'image source, prépare et vide `output/`. | Ne lit pas les pixels. |
 | `image.py` | Décodage, conversion vers sRGB, passage en linéaire, redimensionnement, courbes `tone`. | Ne connaît pas les encres. |
 | `inks.py` | Convertit les couleurs d'encre en densités, construit la matrice de séparation. | Ne sépare pas. |
-| `separation.py` | Transforme une image en N cartes de couverture `[0, 1]`. | Ne trame pas, n'écrit rien. |
+| `separation.py` | Transforme une image en N cartes de couverture `[0, 1]`, solveur borné compris. | Ne trame pas, n'écrit rien. |
 | `halftone.py` | Transforme une carte de couverture continue en carte binaire tramée. | Ignore la couleur. |
 | `output.py` | Encode les PNG/TIFF, ajoute marges et repères de calage. | Ne calcule aucune couverture. |
 | `preview.py` | Recompose les couvertures en une simulation RVB du tirage. | N'influence pas les calques. |

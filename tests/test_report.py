@@ -275,3 +275,21 @@ def test_pied_de_page(tmp_path):
 
 def test_markdown_termine_par_un_saut_de_ligne(tmp_path):
     assert todo(tmp_path).endswith("\n")
+
+
+def test_plafonnement_dencrage_signale(tmp_path):
+    """Une limite qui mord partout bride la séparation plus que le papier."""
+    texte = todo(
+        tmp_path,
+        ink_stats={"total_ink_max": 1.7, "total_ink_mean": 1.5, "limited_fraction": 0.52},
+    )
+    assert "plafonné sur 52 % de l'image" in texte
+    assert "Black" in texte
+
+
+def test_plafonnement_marginal_non_signale(tmp_path):
+    texte = todo(
+        tmp_path,
+        ink_stats={"total_ink_max": 1.7, "total_ink_mean": 0.9, "limited_fraction": 0.01},
+    )
+    assert "plafonné sur" not in texte

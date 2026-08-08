@@ -199,9 +199,20 @@ def _screen_line(profile: Profile, index: int, halftoned: bool) -> str:
     return "diffusion d'erreur (trame stochastique, insensible au moiré)"
 
 
-def _vigilance(profile: Profile, halftoned: bool, warnings: Sequence[str]) -> list[str]:
+def _vigilance(
+    profile: Profile, halftoned: bool, warnings: Sequence[str], ink_stats: dict
+) -> list[str]:
     points: list[str] = []
     output = profile.output
+
+    limited = ink_stats.get("limited_fraction", 0.0)
+    if limited > 0.05:
+        points.append(
+            f"L'encrage total a été plafonné sur {limited * 100:.0f} % de l'image, "
+            f"avec report vers {profile.darkest_ink.label}. Au-delà d'un tiers de "
+            "la surface, c'est le signe que `total_ink_limit` bride la séparation "
+            "plus que le papier ne l'exige."
+        )
 
     if len(profile.inks) > 1:
         points.append(
@@ -286,7 +297,7 @@ def render_todo(
         ]
         lines += [f"- Note : {note}" for note in _layer_notes(profile, index, layer)]
 
-    points = _vigilance(profile, halftoned, warnings)
+    points = _vigilance(profile, halftoned, warnings, ink_stats)
     if points:
         lines += ["", "## Points de vigilance", ""]
         lines += [f"- {point}" for point in points]

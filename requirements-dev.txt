@@ -1,3 +1,8 @@
 -r requirements.txt
 
 pytest>=7.0
+
+# Référence indépendante pour les tests du solveur de `density-lsq`.
+# Le programme lui-même ne s'en sert pas : `scipy.optimize.lsq_linear` résout
+# un problème à la fois, ce qui exclut son usage sur des millions de pixels.
+scipy>=1.11
