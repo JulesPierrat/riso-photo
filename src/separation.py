@@ -12,7 +12,7 @@ import numpy as np
 import itertools
 from dataclasses import dataclass
 
-from .color import LUMA_COEFFS
+from .color import LUMA_COEFFS, linear_to_srgb
 from .config import Profile
 from .errors import NotImplementedYet, ProfileError
 from .image import luminance, relative_luminance
@@ -28,7 +28,23 @@ HIGHLIGHT_FLOOR = 0.02
 #: toute pente raisonnable.
 _CURVE_LUT_SIZE = 8192
 
-_IMPLEMENTED = ("luminance", "duotone", "tritone", "density-lsq")
+_IMPLEMENTED = ("luminance", "duotone", "tritone", "cmyk", "density-lsq")
+
+#: Primaires idéales visées par la méthode `cmyk`, en sRVB **encodé** — le
+#: domaine où opère la séparation quadri, et où les distances discriminent le
+#: mieux : un bon jeu riso s'y place à 0.26 de l'idéal, un jeu arbitraire à
+#: 0.86, là où l'espace linéaire les rapprocherait à 0.37 contre 1.10.
+#: Chaque encre du profil est affectée au rôle dont elle est la plus proche.
+_CMYK_IDEALS = {
+    "cyan": np.array([0.0, 1.0, 1.0], dtype=np.float32),
+    "magenta": np.array([1.0, 0.0, 1.0], dtype=np.float32),
+    "yellow": np.array([1.0, 1.0, 0.0], dtype=np.float32),
+    "black": np.array([0.0, 0.0, 0.0], dtype=np.float32),
+}
+
+#: Distance moyenne à l'idéal au-delà de laquelle le jeu d'encres n'a plus
+#: grand-chose de quadrichromique.
+_CMYK_MISMATCH = 0.5
 
 #: Pondération des canaux dans l'erreur de séparation. À mi-chemin entre un
 #: traitement uniforme et la sensibilité de l'œil : une erreur dans le vert se
@@ -123,6 +139,77 @@ def _separate_tonal(img: np.ndarray, profile: Profile) -> np.ndarray:
     curves = profile.separation.curves or {}
     lum = luminance(img)
     return np.stack([apply_curve(lum, curves[ink.name]) for ink in profile.inks])
+
+
+def assign_cmyk_roles(profile: Profile) -> tuple[list[str], float]:
+    """Affecte à chaque encre le rôle quadri dont elle est la plus proche.
+
+    L'affectation est optimale : avec au plus quatre encres, on énumère les
+    permutations plutôt que de choisir gloutonnement, ce qui éviterait mal les
+    cas où deux encres se disputent le même rôle.
+    """
+    roles = ["cyan", "magenta", "yellow"]
+    if len(profile.inks) == 4:
+        roles.append("black")
+
+    encoded = [linear_to_srgb(ink.color) for ink in profile.inks]
+
+    best, best_cost = roles, float("inf")
+    for candidate in itertools.permutations(roles):
+        cost = sum(
+            float(np.linalg.norm(color - _CMYK_IDEALS[role]))
+            for color, role in zip(encoded, candidate)
+        )
+        if cost < best_cost:
+            best, best_cost = list(candidate), cost
+
+    return best, best_cost / len(profile.inks)
+
+
+def _separate_cmyk(img: np.ndarray, profile: Profile) -> tuple[np.ndarray, list[str]]:
+    """Séparation quadrichromique classique, pour un jeu d'encres proche du CMJN.
+
+    Passage en CMJ, extraction du noir avec GCR paramétrable, puis mappage de
+    chaque canal sur l'encre la plus proche. Sur des encres arbitraires, ce
+    mappage devient une approximation grossière et `density-lsq` fait mieux —
+    le programme le signale.
+
+    La conversion opère dans le domaine perceptuel, comme toute séparation
+    quadri classique : c'est là que `black_generation` se comporte comme on
+    l'attend.
+    """
+    roles, mismatch = assign_cmyk_roles(profile)
+
+    encoded = linear_to_srgb(img)
+    channels = {
+        "cyan": 1.0 - encoded[..., 0],
+        "magenta": 1.0 - encoded[..., 1],
+        "yellow": 1.0 - encoded[..., 2],
+    }
+
+    if "black" in roles:
+        common = np.minimum(
+            np.minimum(channels["cyan"], channels["magenta"]), channels["yellow"]
+        )
+        black = common * profile.separation.black_generation
+        for name in ("cyan", "magenta", "yellow"):
+            channels[name] = channels[name] - black
+        channels["black"] = black
+
+    coverage = np.stack([np.clip(channels[role], 0.0, 1.0) for role in roles])
+
+    warnings: list[str] = []
+    if mismatch > _CMYK_MISMATCH:
+        pairs = ", ".join(
+            f"{ink.label} → {role}" for ink, role in zip(profile.inks, roles)
+        )
+        warnings.append(
+            f"`cmyk` sur un jeu d'encres éloigné de la quadrichromie ({pairs}). "
+            "Le mappage est approximatif ; `density-lsq` gère ce cas nettement "
+            "mieux."
+        )
+
+    return coverage.astype(np.float32), warnings
 
 
 # --------------------------------------------------------------------------
@@ -449,20 +536,26 @@ def separate(img: np.ndarray, profile: Profile) -> tuple[np.ndarray, dict]:
     """
     method = profile.separation.method
     if method not in _IMPLEMENTED:
+        # Défensif : la validation du profil rejette déjà toute méthode
+        # inconnue. Ce garde-fou n'attrape qu'un oubli de câblage.
         raise NotImplementedYet(
-            f"La séparation {method!r} n'est pas encore écrite (lot 6 pour "
-            "`density-lsq`, lot 8 pour `cmyk` — voir doc/plan.md).\n"
+            f"La séparation {method!r} n'est pas câblée.\n"
             f"Méthodes disponibles : {', '.join(_IMPLEMENTED)}."
         )
 
+    warnings: list[str] = []
     if method == "luminance":
         coverage = _separate_luminance(img, profile)
     elif method == "density-lsq":
         coverage = _separate_density_lsq(img, profile)
+    elif method == "cmyk":
+        coverage, warnings = _separate_cmyk(img, profile)
     else:
         coverage = _separate_tonal(img, profile)
 
     if profile.separation.preserve_highlights:
         coverage = np.where(coverage < HIGHLIGHT_FLOOR, 0.0, coverage)
 
-    return limit_ink(coverage, profile)
+    coverage, stats = limit_ink(coverage, profile)
+    stats["warnings"] = warnings
+    return coverage, stats

@@ -10,7 +10,7 @@ Une risographe n'imprime qu'une encre à la fois : un visuel en trois couleurs, 
 
 Les encres sont libres : rose fluo, bleu, jaune, vert, noir — pas seulement du CMJN. C'est ce que permet la méthode de séparation par défaut, décrite dans [`doc/separation.md`](doc/separation.md).
 
-> **État du projet — v0.3.** Les calques partent directement en machine : séparations `luminance`, `duotone`, `tritone` et `density-lsq`, tramage AM et FM, aperçu, rapports. Restent les repères de calage et la méthode `cmyk`. Voir [`doc/roadmap.md`](doc/roadmap.md).
+> **État du projet — v0.4.** Tout ce que la spécification promet est écrit : cinq méthodes de séparation, tramage AM et FM, repères de calage, aperçu, rapports. Reste à éprouver sur de vrais tirages — les couleurs d'encre des profils livrés sont encore théoriques. Voir [`doc/roadmap.md`](doc/roadmap.md).
 
 ---
 
@@ -65,7 +65,7 @@ Les profils vivent dans `config/`. Ils décrivent les encres, le papier et les r
 
 ```bash
 ls config/
-# duotone-rose-noir.json  mono-noir.json  trichro-cmj.json
+# duotone-rose-noir.json  mono-noir.json  quadri-riso.json  trichro-cmj.json
 ```
 
 Prendre le plus proche du matériel disponible, quitte à l'adapter ensuite. Le champ le plus important est la couleur de chaque encre : la référence complète est dans [`doc/config.md`](doc/config.md).

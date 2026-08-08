@@ -225,27 +225,6 @@ def test_tritone_accepte_trois_encres():
 
 
 # --------------------------------------------------------------------------
-# Méthodes non écrites
-
-
-@pytest.mark.parametrize("method", ["cmyk"])
-def test_methodes_non_ecrites(method):
-    profile = build_profile(
-        {
-            "name": "x",
-            "inks": [
-                {"name": "pink", "color": "#FF48B0", "order": 1},
-                {"name": "blue", "color": "#0078BF", "order": 2},
-                {"name": "black", "color": "#231F20", "order": 3},
-            ],
-            "separation": {"method": method},
-        }
-    )
-    with pytest.raises(NotImplementedYet, match="doc/plan.md"):
-        separate(ramp(), profile)
-
-
-# --------------------------------------------------------------------------
 # Hautes lumières
 
 
@@ -320,7 +299,7 @@ def test_limite_non_atteinte_ne_change_rien():
 
 def test_statistiques_dencrage():
     _, stats = separate(ramp(), duo_profile(total_ink_limit=0.9))
-    assert set(stats) == {"total_ink_max", "total_ink_mean", "limited_fraction"}
+    assert set(stats) == {"total_ink_max", "total_ink_mean", "limited_fraction", "warnings"}
     assert 0.0 <= stats["limited_fraction"] <= 1.0
     assert stats["total_ink_mean"] <= stats["total_ink_max"]
 
@@ -540,3 +519,90 @@ def test_solveur_conforme_a_scipy():
 
     # Notre solveur ne doit jamais faire moins bien que la référence.
     assert pire < 1e-4
+
+
+# --------------------------------------------------------------------------
+# Méthode `cmyk`
+
+
+def cmyk_profile(inks=None, **separation):
+    return build_profile(
+        {
+            "name": "quadri",
+            "inks": inks
+            or [
+                {"name": "cyan", "label": "Aqua", "color": "#00AEEF", "order": 1},
+                {"name": "magenta", "label": "Pink", "color": "#EC008C", "order": 2},
+                {"name": "yellow", "label": "Yellow", "color": "#FFF200", "order": 3},
+                {"name": "black", "label": "Black", "color": "#231F20", "order": 4},
+            ],
+            "separation": {"method": "cmyk", "total_ink_limit": 3.2, **separation},
+        }
+    )
+
+
+def test_cmyk_forme_et_bornes():
+    coverage, _ = separate(ramp(), cmyk_profile())
+    assert coverage.shape == (4, 1, 256)
+    assert coverage.min() >= 0.0 and coverage.max() <= 1.0
+
+
+def test_cmyk_affecte_chaque_encre_a_son_role():
+    from src.separation import assign_cmyk_roles
+
+    # Encres volontairement listées dans le désordre.
+    desordre = [
+        {"name": "y", "color": "#FFF200", "order": 1},
+        {"name": "k", "color": "#231F20", "order": 2},
+        {"name": "c", "color": "#00AEEF", "order": 3},
+        {"name": "m", "color": "#EC008C", "order": 4},
+    ]
+    roles, _ = assign_cmyk_roles(cmyk_profile(inks=desordre))
+    assert roles == ["yellow", "black", "cyan", "magenta"]
+
+
+def test_cmyk_papier_nu_sur_le_blanc():
+    coverage, _ = separate(flat(1.0), cmyk_profile())
+    assert float(coverage.max()) == pytest.approx(0.0, abs=1e-3)
+
+
+def test_cmyk_pose_du_noir_sur_le_noir():
+    coverage, _ = separate(flat(0.0), cmyk_profile(black_generation=1.0))
+    assert float(coverage[3].mean()) == pytest.approx(1.0, abs=1e-3)
+
+
+def test_black_generation_remplace_les_couleurs_par_du_noir():
+    """C'est tout l'intérêt du GCR : moins d'encre pour la même noirceur."""
+    gris = flat(0.3)
+
+    sans, _ = separate(gris, cmyk_profile(black_generation=0.0))
+    avec, _ = separate(gris, cmyk_profile(black_generation=1.0))
+
+    assert float(avec[3].mean()) > float(sans[3].mean())
+    assert float(avec.sum(axis=0).mean()) < float(sans.sum(axis=0).mean())
+
+
+def test_cmyk_accepte_trois_encres_sans_noir():
+    trois = [
+        {"name": "c", "color": "#00AEEF", "order": 1},
+        {"name": "m", "color": "#EC008C", "order": 2},
+        {"name": "y", "color": "#FFF200", "order": 3},
+    ]
+    coverage, _ = separate(ramp(), cmyk_profile(inks=trois))
+    assert coverage.shape == (3, 1, 256)
+
+
+def test_cmyk_signale_un_jeu_dencres_inadapte():
+    """Sur des encres arbitraires, le mappage devient une approximation grossière."""
+    exotique = [
+        {"name": "a", "color": "#00A95C", "order": 1},
+        {"name": "b", "color": "#FF6F61", "order": 2},
+        {"name": "c", "color": "#5B4A8A", "order": 3},
+    ]
+    _, stats = separate(ramp(), cmyk_profile(inks=exotique))
+    assert any("density-lsq" in w for w in stats["warnings"])
+
+
+def test_cmyk_ne_signale_rien_sur_un_jeu_proche():
+    _, stats = separate(ramp(), cmyk_profile())
+    assert stats["warnings"] == []

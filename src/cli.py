@@ -15,7 +15,7 @@ import numpy as np
 
 from . import __version__
 from .config import CONFIG_DIR, Profile, load_profile
-from .errors import NotImplementedYet, RisoError
+from .errors import RisoError
 from .halftone import halftone
 from .image import (
     apply_tone,
@@ -238,11 +238,6 @@ def run(args: argparse.Namespace) -> int:
     if args.dry_run:
         return 0
 
-    if args.out is not None:
-        raise NotImplementedYet(
-            "`--out` n'est pas encore là (lot 8, voir doc/plan.md). La sortie "
-            "va dans le dossier `output/` du projet."
-        )
     print("\nTraitement…")
     img = load_linear(project.source)
     img = resize_to(
@@ -256,6 +251,7 @@ def run(args: argparse.Namespace) -> int:
     coverage, ink_stats = separate(img, profile)
     del img  # 440 Mo sur un A4 à 600 dpi, dont l'aperçu n'a plus besoin
 
+    warnings.extend(ink_stats.pop("warnings", []))
     print(render_coverage(profile, coverage, ink_stats))
 
     halftoned = profile.halftone.method != "none"
@@ -275,7 +271,7 @@ def run(args: argparse.Namespace) -> int:
     else:
         screened = coverage
 
-    output_dir = prepare_output(project)
+    output_dir = prepare_output(project, args.out)
     written = []
 
     preview_path = output_dir / PREVIEW_FILENAME

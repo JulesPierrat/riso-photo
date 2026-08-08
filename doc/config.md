@@ -243,5 +243,6 @@ Le profil est validé intégralement **avant** tout calcul, pour éviter d'écho
 - `bit_depth: 16` avec un tramage actif → sans effet, la sortie est binaire.
 - Une encre dont `color` est très proche de `paper.color` → contribution quasi nulle.
 - Clé inconnue dans une section → probable faute de frappe, la valeur est ignorée.
+- `registration_marks` activé avec `margin_mm` sous 3 mm → les repères ne tiendraient pas.
 
 Chaque avertissement remonte sur la sortie standard **et** dans le `todo.md`, pour qu'il atteigne la personne qui imprime et pas seulement celle qui lance le programme.

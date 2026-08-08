@@ -1,0 +1,78 @@
+{
+  "name": "Quadrichromie riso",
+  "description": "Quatre passages sur papier blanc 170g. Jeu d'encres proche du CMJN, ce qui rend la méthode `cmyk` pertinente — sur des encres arbitraires, préférer `density-lsq`.",
+
+  "inks": [
+    {
+      "name": "yellow",
+      "label": "Yellow",
+      "color": "#FFF200",
+      "order": 1,
+      "opacity": 0.85,
+      "screen_angle": 0,
+      "max_coverage": 1.0
+    },
+    {
+      "name": "cyan",
+      "label": "Aqua",
+      "color": "#00AEEF",
+      "order": 2,
+      "opacity": 0.85,
+      "screen_angle": 15,
+      "max_coverage": 1.0
+    },
+    {
+      "name": "magenta",
+      "label": "Fluorescent Pink",
+      "color": "#EC008C",
+      "order": 3,
+      "opacity": 0.85,
+      "screen_angle": 75,
+      "max_coverage": 0.9
+    },
+    {
+      "name": "black",
+      "label": "Black",
+      "color": "#231F20",
+      "order": 4,
+      "opacity": 1.0,
+      "screen_angle": 45,
+      "max_coverage": 1.0
+    }
+  ],
+
+  "paper": {
+    "color": "#FFFFFF",
+    "label": "Blanc 170g non couché"
+  },
+
+  "separation": {
+    "method": "cmyk",
+    "total_ink_limit": 2.4,
+    "black_generation": 0.6,
+    "preserve_highlights": true
+  },
+
+  "tone": {
+    "gamma": 1.0,
+    "contrast": 0.1,
+    "black_point": 0.01,
+    "white_point": 0.99
+  },
+
+  "halftone": {
+    "method": "clustered-dot",
+    "lpi": 60,
+    "dot_shape": "round"
+  },
+
+  "output": {
+    "dpi": 600,
+    "format": "png",
+    "bit_depth": 8,
+    "invert": false,
+    "long_edge_mm": 297,
+    "registration_marks": true,
+    "margin_mm": 5
+  }
+}

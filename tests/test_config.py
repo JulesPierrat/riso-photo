@@ -333,7 +333,9 @@ def test_les_listes_sont_remplacees_pas_concatenees(workspace, monkeypatch):
 # Profils livrés
 
 
-@pytest.mark.parametrize("name", ["mono-noir", "duotone-rose-noir", "trichro-cmj"])
+@pytest.mark.parametrize(
+    "name", ["mono-noir", "duotone-rose-noir", "trichro-cmj", "quadri-riso"]
+)
 def test_les_profils_livres_sont_valides_et_sans_avertissement(name):
     profile = load_profile(name)
     assert profile.warnings == (), f"{name} : {profile.warnings}"

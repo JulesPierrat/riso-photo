@@ -22,7 +22,7 @@ python riso-photo.py <nom_projet> -c <config> [options]
 | `--preview-halftoned` | — | L'aperçu est calculé à partir des calques tramés au lieu des couvertures continues. Plus fidèle, nettement plus lent. |
 | `--no-halftone` | — | Sortie en ton continu. Équivaut à forcer `halftone.method = "none"`. |
 | `--dry-run` | — | Exécute le calcul et affiche le plan d'impression sur la sortie standard sans rien écrire sur disque. |
-| `--out CHEMIN` | `project/<nom>/output` | Redirige les fichiers produits ailleurs. |
+| `--out CHEMIN` | `project/<nom>/output` | Redirige les fichiers produits ailleurs. Voir les garde-fous ci-dessous. |
 | `-v, --verbose` | — | Détaille chaque étape : dimensions, couverture par encre, temps de calcul. |
 | `-h, --help` | — | Aide. |
 
@@ -62,6 +62,14 @@ Le dossier `output/` est ignoré par la détection.
 La contrepartie est que `output/` ne doit jamais contenir de travail manuel. Tout ce qui doit survivre à un run se met à la racine du projet, qui n'est jamais touchée — l'image source, des notes, des essais retouchés à la main.
 
 Si `output/` contient des fichiers qui ne portent pas la signature d'un run précédent (absence de `run.json`), le programme s'arrête et demande confirmation plutôt que d'effacer aveuglément un dossier qu'il n'a pas créé.
+
+### `--out` et ses garde-fous
+
+`--out` désigne un dossier que le programme va **vider**. Une faute de frappe y coûterait cher, d'où trois refus catégoriques, en plus du contrôle de signature `run.json` qui s'applique comme partout ailleurs :
+
+- la racine du système ;
+- un dossier qui **contient** le projet — `--out project` effacerait la photo source ;
+- le dossier du projet lui-même.
 
 ## Codes de sortie
 

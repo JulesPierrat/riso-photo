@@ -86,18 +86,20 @@ def resolve_project(name: str, base: Path = PROJECT_DIR) -> Project:
     )
 
 
-def prepare_output(project: Project) -> Path:
-    """Vide et recrée `output/`.
+def prepare_output(project: Project, override: Path | None = None) -> Path:
+    """Vide et recrée le dossier de sortie.
 
     Refuse de supprimer un dossier non vide dépourvu de `run.json` : sans cette
     signature, rien ne prouve que le programme en soit l'auteur, et l'écrasement
     est irréversible.
     """
-    output = project.output_dir
-
-    # Garde-fou : ne jamais effacer autre chose que le `output/` du projet.
-    if output.name != OUTPUT_DIRNAME or output.parent != project.root:
-        raise RisoError(f"Dossier de sortie inattendu : {output}")
+    if override is None:
+        output = project.output_dir
+        # Garde-fou : ne jamais effacer autre chose que le `output/` du projet.
+        if output.name != OUTPUT_DIRNAME or output.parent != project.root:
+            raise RisoError(f"Dossier de sortie inattendu : {output}")
+    else:
+        output = _checked_override(override, project)
 
     if output.exists():
         if not output.is_dir():
@@ -114,4 +116,25 @@ def prepare_output(project: Project) -> Path:
         shutil.rmtree(output)
 
     output.mkdir(parents=True)
+    return output
+
+
+def _checked_override(override: Path, project: Project) -> Path:
+    """Valide un dossier de sortie choisi par l'utilisateur.
+
+    `--out` désigne un dossier que le programme va **vider**. Trois refus, qui
+    couvrent les fautes de frappe capables de détruire du travail : la racine
+    du système, un dossier qui contient le projet, et le projet lui-même. Le
+    contrôle de signature `run.json` s'applique ensuite comme partout ailleurs.
+    """
+    output = override.resolve()
+    root = project.root.resolve()
+
+    if output.parent == output:
+        raise UsageError(f"--out : {output} est la racine du système.")
+    if output == root or output in root.parents:
+        raise UsageError(
+            f"--out : {output} contient le projet. Le vider effacerait la "
+            "photo source."
+        )
     return output

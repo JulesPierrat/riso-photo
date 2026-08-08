@@ -40,6 +40,9 @@ MIN_ANGLE_SPREAD = 15.0
 #: Rapport dpi/lpi en deçà duquel les dégradés montrent des bandes.
 MIN_DPI_LPI_RATIO = 8.0
 
+#: Marge minimale pour loger des repères de calage lisibles, en millimètres.
+MIN_MARK_MARGIN_MM = 3.0
+
 
 # --------------------------------------------------------------------------
 # Structures
@@ -604,6 +607,13 @@ def _cross_checks(
         report.warn(
             f"separation.total_ink_limit = {separation.total_ink_limit * 100:.0f} % : "
             "risque de saturation du papier et de séchage incomplet"
+        )
+
+    if output.registration_marks and output.margin_mm < MIN_MARK_MARGIN_MM:
+        report.warn(
+            f"output.margin_mm = {output.margin_mm:g} mm : trop étroit pour des "
+            f"repères de calage lisibles (viser {MIN_MARK_MARGIN_MM:g} mm). "
+            "Le calage se fera à vue."
         )
 
     if output.bit_depth == 16 and halftone.method != "none":

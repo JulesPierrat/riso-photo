@@ -58,11 +58,15 @@ Si la source ne permet pas d'atteindre la résolution demandée, un avertissemen
 
 ### Repères de calage
 
-Avec `registration_marks: true`, des croix de repérage sont ajoutées dans la marge aux quatre coins, **identiques et à la même position sur tous les calques**.
+Avec `registration_marks: true`, une croix inscrite dans un cercle est ajoutée dans chacun des quatre coins de la marge, **identique et à la même position sur tous les calques**. Elles sont dessinées depuis la seule géométrie, jamais depuis le contenu du calque : c'est ce qui garantit l'alignement au pixel près, et c'est toute leur utilité.
 
-Elles servent à aligner physiquement les passages : on cale le second passage sur le premier en superposant les croix à contre-jour. Le repérage d'une risographe dérive typiquement de 1 à 2 mm d'une feuille à l'autre — ces repères permettent de mesurer la dérive et de compenser au chargement.
+Elles servent à aligner physiquement les passages : on superpose deux tirages à contre-jour et l'écart des croix donne la dérive de repérage, typiquement 1 à 2 mm sur une risographe. Le cercle apporte une référence continue, qui rend un décalage bien plus lisible qu'une croix seule.
 
-Elles se trouvent dans la marge, donc hors du format final : elles disparaissent au massicot. D'où l'avertissement du `todo.md` de ne pas couper avant vérification.
+Les repères sont tracés **après** le tramage, en trait plein : un repère tramé serait illisible.
+
+Ils se trouvent dans la marge, donc hors du format final : ils disparaissent au massicot. D'où l'avertissement du `todo.md` de ne pas couper avant vérification.
+
+Une marge inférieure à 3 mm ne peut pas les loger lisiblement ; le programme le signale à la validation du profil.
 
 ---
 
@@ -71,6 +75,8 @@ Elles se trouvent dans la marge, donc hors du format final : elles disparaissent
 Simulation RVB du tirage, obtenue en recomposant les couvertures par le modèle multiplicatif décrit dans [separation.md](separation.md), en partant de `paper.color`.
 
 Par défaut, l'aperçu est calculé à partir des couvertures **continues**, avant tramage : rapide et lisible. `--preview-halftoned` le calcule à partir des calques tramés — plus fidèle au grain réel, nettement plus lent, utile pour vérifier qu'une linéature ne bouche pas les ombres.
+
+L'aperçu ne porte **ni marge ni repères** : il simule le tirage massicoté, celui qu'on regarde. Ses dimensions sont donc plus petites que celles des calques, qui embarquent la marge de service.
 
 **Ce que l'aperçu montre bien :** la répartition tonale, le contraste, quelle encre porte quelle partie de l'image, l'équilibre entre les calques.
 

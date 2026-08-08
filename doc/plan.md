@@ -81,10 +81,10 @@ class Project:
 
 def resolve_project(name: str, base: Path = Path("project")) -> Project
 def find_source(root: Path) -> Path
-def prepare_output(project: Project) -> None
+def prepare_output(project: Project, override: Path | None = None) -> Path
 ```
 
-`prepare_output` refuse de vider un `output/` non vide qui ne contient pas de `run.json` — signature d'un dossier produit par le programme.
+`prepare_output` refuse de vider un `output/` non vide qui ne contient pas de `run.json` — signature d'un dossier produit par le programme. L'`override` du lot 8 sert `--out` et reçoit ses propres garde-fous.
 
 ### `src/image.py`
 
@@ -144,10 +144,13 @@ def composite(cov: np.ndarray, profile: Profile) -> np.ndarray   # (H, W, 3) lin
 ### `src/output.py`
 
 ```python
-def add_margin_and_marks(a: np.ndarray, cfg: OutputCfg, dpi: int) -> np.ndarray
+def layer_filename(ink: Ink, cfg: OutputCfg) -> str
+def add_margin_and_marks(layer: np.ndarray, cfg: OutputCfg) -> np.ndarray
 def write_layer(cov: np.ndarray, path: Path, cfg: OutputCfg) -> None
-def write_preview(rgb_linear: np.ndarray, path: Path) -> None
+def write_preview(rgb_linear: np.ndarray, path: Path, cfg: OutputCfg) -> None
 ```
+
+`add_margin_and_marks` n'a pas besoin du `dpi` du contrat initial : `OutputCfg` le porte déjà.
 
 `write_layer` est le **seul** endroit du programme où `output.invert` est lu.
 
@@ -325,11 +328,13 @@ Deux écarts au contrat :
 | | |
 |---|---|
 | **Objectif** | Tout ce que la spécification promet encore. |
-| **Fichiers** | `src/output.py` (complété), `src/separation.py`, `config/quadri-riso.json` |
+| **Fichiers** | `src/output.py` (complété), `src/separation.py`, `src/project.py`, `config/quadri-riso.json` |
 | **Dépend de** | Lot 7 |
 | **Taille** | ~250 lignes |
 
-Marges et repères de calage, méthode `cmyk`, options CLI restantes (`--out`, `--preview-halftoned`).
+Marges et repères de calage, méthode `cmyk`, option `--out`.
+
+`--out` désigne un dossier que le programme va vider : il reçoit ses propres garde-fous, décrits dans [cli.md](cli.md). Le contrôle de signature `run.json` ne suffit pas — il faut aussi refuser la racine du système et tout dossier contenant le projet.
 
 **Fin de lot** — les repères tombent au pixel près à la même position sur tous les calques. C'est le seul critère qui compte : un décalage d'un pixel entre deux calques rend les repères inutilisables pour caler la machine.
 
@@ -383,6 +388,6 @@ Les tests s'exécutent avec `python3 -m pytest` depuis la racine du dépôt. Dé
 | 5 | `todo.md`, `run.json` | 4 | ~200 | **v0.1** |
 | 6 | `density-lsq` | 5 + tirage | ~150 | **v0.2** |
 | 7 | Tramage | 6 | ~250 | **v0.3** |
-| 8 | Repères, `cmyk`, `tritone` | 7 | ~250 | **v0.4** |
+| 8 | Repères, `cmyk`, `--out` | 7 | ~250 | **v0.4** |
 
 Environ 1 800 lignes hors tests. La validation du profil et le tramage concentrent le volume ; `density-lsq`, court, concentre la difficulté.

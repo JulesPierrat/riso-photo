@@ -8,7 +8,7 @@ from PIL import Image
 
 from src.config import Ink, OutputCfg
 from src.color import hex_to_linear
-from src.output import layer_filename, write_layer, write_preview
+from src.output import add_margin_and_marks, layer_filename, write_layer, write_preview
 
 
 def cfg(**kwargs) -> OutputCfg:
@@ -170,3 +170,100 @@ def test_apercu_bornes(tmp_path):
 
     pixel = np.asarray(Image.open(path))[0, 0]
     assert pixel[0] == 0 and pixel[1] == 255
+
+
+# --------------------------------------------------------------------------
+# Marges et repères de calage
+
+
+def marges(**kwargs):
+    base = dict(margin_mm=5.0, dpi=600, registration_marks=True)
+    return cfg(**{**base, **kwargs})
+
+
+def test_la_marge_agrandit_le_calque():
+    layer = np.zeros((100, 200), dtype=np.float32)
+    out = add_margin_and_marks(layer, marges(registration_marks=False))
+
+    marge = round(5.0 / 25.4 * 600)  # 118 px
+    assert out.shape == (100 + 2 * marge, 200 + 2 * marge)
+
+
+def test_la_marge_est_du_papier_nu():
+    layer = np.ones((40, 40), dtype=np.float32)
+    out = add_margin_and_marks(layer, marges(registration_marks=False))
+
+    assert float(out[0, :].max()) == 0.0
+    assert float(out[:, 0].max()) == 0.0
+    assert float(out[118:158, 118:158].min()) == 1.0  # l'image est intacte
+
+
+def test_sans_marge_le_calque_est_inchange():
+    layer = np.zeros((10, 10), dtype=np.float32)
+    assert add_margin_and_marks(layer, marges(margin_mm=0.0)) is layer
+
+
+def test_les_reperes_sont_dans_la_marge():
+    layer = np.zeros((300, 300), dtype=np.float32)
+    out = add_margin_and_marks(layer, marges())
+
+    marge = round(5.0 / 25.4 * 600)
+    assert float(out.max()) == 1.0  # des repères ont été tracés
+    # Rien n'a débordé sur le format utile.
+    assert float(out[marge:-marge, marge:-marge].max()) == 0.0
+
+
+def test_les_reperes_occupent_les_quatre_coins():
+    out = add_margin_and_marks(np.zeros((300, 300), dtype=np.float32), marges())
+    marge = round(5.0 / 25.4 * 600)
+
+    coins = [
+        out[:marge, :marge],
+        out[:marge, -marge:],
+        out[-marge:, :marge],
+        out[-marge:, -marge:],
+    ]
+    assert all(float(coin.max()) == 1.0 for coin in coins)
+
+
+def test_les_reperes_tombent_au_pixel_pres_sur_tous_les_calques():
+    """Le critère de fin du lot.
+
+    Un décalage d'un seul pixel entre deux calques rendrait les repères
+    inutilisables : c'est justement l'écart qu'ils servent à mesurer.
+    """
+    rng = np.random.default_rng(0)
+    formats = marges()
+
+    a = add_margin_and_marks(rng.random((200, 300), dtype=np.float32), formats)
+    b = add_margin_and_marks(rng.random((200, 300), dtype=np.float32), formats)
+
+    marge = round(5.0 / 25.4 * 600)
+    # Hors du format utile, les deux calques doivent être identiques.
+    assert np.array_equal(a[:marge], b[:marge])
+    assert np.array_equal(a[-marge:], b[-marge:])
+    assert np.array_equal(a[:, :marge], b[:, :marge])
+    assert np.array_equal(a[:, -marge:], b[:, -marge:])
+
+
+def test_reperes_desactivables():
+    layer = np.zeros((200, 200), dtype=np.float32)
+    out = add_margin_and_marks(layer, marges(registration_marks=False))
+    assert float(out.max()) == 0.0
+
+
+def test_les_reperes_sont_pleins_pas_trames():
+    """Un repère tramé serait illisible : il doit être un trait plein."""
+    out = add_margin_and_marks(np.zeros((200, 200), dtype=np.float32), marges())
+    marge = round(5.0 / 25.4 * 600)
+    coin = out[:marge, :marge]
+    assert set(np.unique(coin)) == {0.0, 1.0}
+
+
+def test_le_calque_ecrit_porte_la_marge(tmp_path):
+    path = tmp_path / "calque.png"
+    write_layer(np.zeros((100, 100), dtype=np.float32), path, marges())
+
+    with Image.open(path) as img:
+        marge = round(5.0 / 25.4 * 600)
+        assert img.size == (100 + 2 * marge, 100 + 2 * marge)

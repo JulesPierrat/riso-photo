@@ -151,10 +151,24 @@ def test_preview_halftoned(workspace, monkeypatch):
     )
 
 
-def test_out_pas_encore_ecrit(workspace, monkeypatch, capsys):
-    """Un lot non terminé s'arrête sur un message explicite, pas un plantage."""
-    assert run(["demo", "-c", "test", "--out", "ailleurs"], workspace, monkeypatch) == 3
-    assert "lot 8" in capsys.readouterr().err
+def test_out_redirige_la_sortie(workspace, monkeypatch):
+    assert run(["demo", "-c", "test", "--out", "ailleurs"], workspace, monkeypatch) == 0
+
+    produced = {p.name for p in (workspace / "ailleurs").iterdir()}
+    assert "01_pink.png" in produced and "run.json" in produced
+    assert not (workspace / "project" / "demo" / "output").exists()
+
+
+def test_out_refuse_un_dossier_contenant_le_projet(workspace, monkeypatch, capsys):
+    """`--out project` effacerait la photo source."""
+    assert run(["demo", "-c", "test", "--out", "project"], workspace, monkeypatch) == 1
+    assert "contient le projet" in capsys.readouterr().err
+    assert (workspace / "project" / "demo" / "source.jpg").exists()
+
+
+def test_out_refuse_la_racine(workspace, monkeypatch, capsys):
+    assert run(["demo", "-c", "test", "--out", "/"], workspace, monkeypatch) == 1
+    assert "racine du système" in capsys.readouterr().err
 
 
 def test_surcharge_dpi_visible_dans_le_resume(workspace, monkeypatch, capsys):

@@ -76,7 +76,11 @@ Le réglage se fait entièrement dans les courbes. C'est la méthode la plus man
 
 Séparation quadrichromique classique : passage en CMJ, extraction du noir avec GCR paramétrable par `black_generation`, puis mappage de chaque canal sur l'encre riso la plus proche.
 
-Pertinente uniquement si le jeu d'encres est effectivement proche du CMJN. Sur des encres arbitraires, le mappage devient une approximation grossière et `density-lsq` fait mieux.
+Le calcul opère dans le **domaine perceptuel**, comme toute séparation quadri classique : c'est là que `black_generation` se comporte comme on l'attend, et là que les distances entre encres discriminent le mieux.
+
+L'affectation des rôles est optimale plutôt que gloutonne : avec au plus quatre encres, on énumère les permutations. Un choix glouton se ferait piéger dès que deux encres se disputent le même rôle — et l'ordre de déclaration dans le profil n'a alors plus aucune importance.
+
+Pertinente uniquement si le jeu d'encres est effectivement proche du CMJN. Sur des encres arbitraires, le mappage devient une approximation grossière et `density-lsq` fait mieux : le programme mesure l'écart moyen à la quadrichromie idéale et le signale. Un jeu riso soigné s'en tient à 0.26, un jeu arbitraire monte à 0.86.
 
 ### `density-lsq` — N encres arbitraires (défaut)
 

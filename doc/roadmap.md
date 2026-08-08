@@ -14,7 +14,7 @@ Vue produit : où en est le projet et où il va. Pour le découpage du développ
 - [x] **Lot 5** — `todo.md` → **v0.1** ✅ *chaîne complète, prête pour le premier tirage*
 - [x] **Lot 6** — séparation `density-lsq` → **v0.2**
 - [x] **Lot 7** — tramage → **v0.3**
-- [ ] **Lot 8** — repères de calage, `cmyk` → **v0.4**
+- [x] **Lot 8** — repères de calage, `cmyk` → **v0.4** ✅ *spécification complète*
 
 ## Jalons
 
