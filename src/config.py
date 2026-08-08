@@ -173,6 +173,15 @@ class Profile:
         """
         return min(self.inks, key=lambda i: float(np.dot(i.color, LUMA_COEFFS)))
 
+    @property
+    def lightest_ink(self) -> Ink:
+        """L'encre la plus claire, celle qu'on imprime en premier par convention.
+
+        Sert au `todo.md` à vérifier que l'ordre de passage déclaré suit bien
+        l'usage clair → foncé.
+        """
+        return max(self.inks, key=lambda i: float(np.dot(i.color, LUMA_COEFFS)))
+
 
 # --------------------------------------------------------------------------
 # Accumulateur de validation

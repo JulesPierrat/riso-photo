@@ -46,7 +46,13 @@ def test_run_complet(workspace, monkeypatch, capsys):
     assert run(["demo", "-c", "test"], workspace, monkeypatch) == 0
 
     produced = {p.name for p in (workspace / "project" / "demo" / "output").iterdir()}
-    assert produced == {"01_pink.png", "02_black.png", "preview.png", "run.json"}
+    assert produced == {
+        "01_pink.png",
+        "02_black.png",
+        "preview.png",
+        "todo.md",
+        "run.json",
+    }
 
     out = capsys.readouterr().out
     assert "Couvertures :" in out

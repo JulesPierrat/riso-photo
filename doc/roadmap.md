@@ -11,7 +11,7 @@ Vue produit : où en est le projet et où il va. Pour le découpage du développ
 - [x] **Lot 2** — chaîne image, colorimétrie, courbes tonales
 - [x] **Lot 3** — encres, séparations `luminance` et `duotone`
 - [x] **Lot 4** — aperçu de surimpression, écriture des calques, `run.json`
-- [ ] **Lot 5** — `todo.md` → **v0.1**
+- [x] **Lot 5** — `todo.md` → **v0.1** ✅ *chaîne complète, prête pour le premier tirage*
 - [ ] **Lot 6** — séparation `density-lsq` → **v0.2**
 - [ ] **Lot 7** — tramage → **v0.3**
 - [ ] **Lot 8** — repères de calage, `cmyk`, `tritone` → **v0.4**

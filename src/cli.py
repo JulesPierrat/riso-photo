@@ -25,7 +25,7 @@ from .image import (
 from .output import PREVIEW_FILENAME, write_layer, write_preview
 from .preview import composite
 from .project import PROJECT_DIR, RUN_SIGNATURE, Project, prepare_output, resolve_project
-from .report import layer_stats, write_run_json
+from .report import TODO_FILENAME, layer_stats, write_run_json, write_todo
 from .separation import separate
 
 
@@ -275,14 +275,7 @@ def run(args: argparse.Namespace) -> int:
     written.append(preview_path)
 
     layers = layer_stats(profile, coverage)
-    if not args.preview_only:
-        for index, ink in enumerate(profile.inks):
-            path = output_dir / layers[index].file
-            write_layer(coverage[index], path, profile.output)
-            written.append(path)
-
-    write_run_json(
-        output_dir / RUN_SIGNATURE,
+    reports = dict(
         project=project,
         profile=profile,
         layers=layers,
@@ -291,6 +284,20 @@ def run(args: argparse.Namespace) -> int:
         ink_stats=ink_stats,
         warnings=warnings,
     )
+
+    if not args.preview_only:
+        for index in range(len(profile.inks)):
+            path = output_dir / layers[index].file
+            write_layer(coverage[index], path, profile.output)
+            written.append(path)
+
+        todo_path = output_dir / TODO_FILENAME
+        # `halftoned=False` tant que le lot 7 n'est pas là : le plan doit dire
+        # ce qui est réellement dans les fichiers, pas ce que le profil demande.
+        write_todo(todo_path, **reports, halftoned=False)
+        written.append(todo_path)
+
+    write_run_json(output_dir / RUN_SIGNATURE, **reports)
 
     print(f"\nÉcrit dans {output_dir}/ :")
     for path in sorted(written):

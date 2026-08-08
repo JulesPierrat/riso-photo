@@ -149,7 +149,18 @@ Encrage total maximum atteint : 152 % (limite du profil : 170 %) ✅
 
 **En-tête** — profil, source et dimensions effectives, papier, encrage total atteint face à la limite du profil.
 
-**Un bloc par passage**, dans l'ordre machine — encre, fichier, réglages de trame, couvertures moyenne et maximale, et une note contextuelle générée selon le rôle de l'encre dans la séparation.
+**Un bloc par passage**, dans l'ordre machine — encre, fichier, réglages de trame, couvertures moyenne et maximale, et des notes générées à partir du rôle réel de l'encre dans cette séparation :
+
+| Situation | Note |
+|---|---|
+| L'encre la plus claire ouvre la série | Rappelle pourquoi : moins de maculage au passage suivant. |
+| Le premier passage **n'est pas** l'encre la plus claire | Signale l'écart à l'usage et invite à vérifier que l'ordre est voulu. |
+| L'encre la plus dense | Indique que c'est elle qui porte le contraste. |
+| Couverture moyenne sous 3 % | Suggère de retirer ce passage : un tour de machine pour presque rien. |
+| `max_coverage` atteint sur plus de 1 % de l'image | Chiffre la surface aplatie et invite à relever le plafond. |
+| Couverture à 100 % sur plus de 1 % | Même constat, mais sans conseil : l'encre donne déjà tout ce qu'elle peut. |
+
+La ligne « Trame » décrit **ce qui est réellement dans les fichiers**, pas ce que le profil réclame : tant que le tramage n'est pas appliqué, elle annonce du ton continu à tramer par le pilote.
 
 **Points de vigilance** — séchage entre passages, tolérance de repérage, consignes de chargement papier, plus tous les avertissements du run : sous-résolution, plafond d'encrage atteint, angles de trame trop proches, `bit_depth` sans effet.
 
