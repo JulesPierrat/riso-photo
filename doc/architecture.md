@@ -61,7 +61,11 @@ Chaque étape produit une entrée figée pour la suivante.
 
 **4. Géométrie** — redimensionnement vers la taille cible déduite de `output.long_edge_mm` et `output.dpi`. Si la source est plus petite que la cible, un avertissement de sous-résolution est levé — le programme n'interpole pas silencieusement vers le haut sans le dire.
 
-**5. Corrections tonales** — application de `tone` (point noir, point blanc, gamma, contraste, désaturation) sur l'image linéaire. C'est ici qu'on compense les défauts connus de la risographe, avant que la séparation ne fige quoi que ce soit.
+**5. Corrections tonales** — application de `tone` (point noir, point blanc, gamma, contraste, désaturation). C'est ici qu'on compense les défauts connus de la risographe, avant que la séparation ne fige quoi que ce soit.
+
+La désaturation opère en linéaire — c'est un mélange de lumière. Les trois autres réglages opèrent dans le **domaine perceptuel** : en linéaire, un contraste ou un gamma pivoteraient autour de 0.5, qui n'est pas le gris moyen (celui-ci vaut 0.216 en lumière linéaire), et se comporteraient de façon contre-intuitive. L'entrée et la sortie de l'étape restent linéaires, l'aller-retour est interne.
+
+Comme la courbe est une fonction scalaire identique sur les trois canaux, elle est tabulée sur 8192 échantillons puis appliquée par indexation. Sur les ~37 Mpx d'un A4 à 600 dpi, cela ramène l'étape de plusieurs secondes à moins d'une seconde — ce qui rend `--preview-only` réellement utilisable pour itérer.
 
 **6. Séparation** — `separation.py` produit N cartes de couverture `float32` dans `[0, 1]`, une par encre. Voir [separation.md](separation.md).
 
@@ -82,7 +86,7 @@ En `--dry-run`, les étapes 1 à 7 s'exécutent normalement et le rapport est af
 Ces règles s'appliquent partout dans `src/` et évitent la majorité des bugs de signe et d'échelle.
 
 - **Type et plage** — toutes les images intermédiaires sont des `numpy.float32` dans `[0, 1]`. La conversion en 8 ou 16 bits n'a lieu qu'à l'écriture.
-- **Espace linéaire** — dès le chargement, on quitte le sRGB encodé en gamma pour du linéaire. Tout mélange de couleur effectué en gamma est faux ; c'est l'erreur classique de ce type de programme.
+- **Espace linéaire** — dès le chargement, on quitte le sRVB encodé en gamma pour du linéaire. Tout mélange de couleur effectué en gamma est faux ; c'est l'erreur classique de ce type de programme. Seule exception, assumée : les courbes tonales de l'étape 5, qui sont des réglages perceptuels et non des mélanges. Elles font l'aller-retour en interne et rendent du linéaire.
 - **Axes** — les images couleur sont `(H, W, C)`, les cartes de couverture `(H, W)`, la pile de calques `(N, H, W)` avec `N` dans l'ordre de passage.
 - **Sens de la couverture** — en interne, `1.0` signifie **encre pleine**, toujours, quelle que soit la valeur de `output.invert`. L'inversion éventuelle est appliquée au tout dernier moment, dans `output.py`.
 - **Immuabilité du profil** — l'objet `Profile` issu de `config.py` n'est jamais modifié en cours de route. Les surcharges CLI (`--dpi`, `--no-halftone`) sont appliquées à la construction, et `run.json` reflète l'état final effectif.

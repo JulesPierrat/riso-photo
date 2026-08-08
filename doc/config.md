@@ -167,6 +167,8 @@ Corrections appliquées **avant** la séparation, sur l'image en espace linéair
 | `white_point` | 0.0–1.0 | `1.0` | Niveau ramené au blanc. |
 | `desaturate` | 0.0–1.0 | `0.0` | `1.0` sépare une version entièrement désaturée de la photo. |
 
+`gamma`, `contrast` et les points noir/blanc s'appliquent dans le **domaine perceptuel** : `0.5` y désigne bien le gris moyen, et un contraste pivote autour de lui. `desaturate` opère en revanche sur la lumière linéaire, puisque c'est un mélange physique. Voir doc/architecture.md.
+
 La risographe écrase les basses lumières et délave les hautes lumières. Un léger relèvement du contraste (`0.1` à `0.2`) et un point noir non nul compensent presque toujours. C'est le premier réglage à ajuster quand un tirage sort mou — avant de toucher à la séparation.
 
 `--preview-only` existe précisément pour itérer vite sur ces cinq valeurs.

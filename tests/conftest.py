@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import numpy as np
 import pytest
+from PIL import Image
 
 
 @pytest.fixture
@@ -41,6 +43,29 @@ def workspace(tmp_path: Path, profile_data: dict) -> Path:
 
     demo = tmp_path / "project" / "demo"
     demo.mkdir(parents=True)
-    (demo / "source.jpg").write_bytes(b"")
+    build_image(400, 300).save(demo / "source.jpg", quality=95)
 
     return tmp_path
+
+
+@pytest.fixture
+def make_image():
+    """Fabrique de mires, exposée en fixture pour éviter un import entre tests."""
+    return build_image
+
+
+def build_image(width: int, height: int) -> Image.Image:
+    """Mire déterministe : rampe de luminance horizontale, teinte verticale.
+
+    Couvre les cas où les erreurs de colorimétrie se voient — extrêmes purs,
+    dégradés doux, canaux dissociés — sans embarquer de binaire dans le dépôt.
+    """
+    x = np.linspace(0.0, 1.0, width, dtype=np.float32)[np.newaxis, :]
+    y = np.linspace(0.0, 1.0, height, dtype=np.float32)[:, np.newaxis]
+
+    red = x
+    green = x * (1.0 - 0.5 * y)
+    blue = x * y
+
+    rgb = np.stack(np.broadcast_arrays(red, green, blue), axis=-1)
+    return Image.fromarray((rgb * 255.0).round().astype(np.uint8), mode="RGB")

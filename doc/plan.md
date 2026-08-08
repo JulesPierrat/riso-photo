@@ -90,11 +90,17 @@ def prepare_output(project: Project) -> None
 
 ```python
 def load_linear(path: Path) -> np.ndarray            # (H, W, 3)
+def source_size(path: Path) -> tuple[int, int]       # sans décoder les pixels
 def target_long_edge_px(long_edge_mm: float, dpi: int) -> int
 def resize_to(img: np.ndarray, long_edge_px: int) -> np.ndarray
+def resolution_warning(source_px: int, target_px: int) -> str | None
+def relative_luminance(img: np.ndarray) -> np.ndarray  # (H, W) Y linéaire
+def luminance(img: np.ndarray) -> np.ndarray           # (H, W) échelle perceptuelle
+def tone_curve(x: np.ndarray, cfg: ToneCfg) -> np.ndarray   # courbe de référence
 def apply_tone(img: np.ndarray, cfg: ToneCfg) -> np.ndarray
-def luminance(img: np.ndarray) -> np.ndarray         # (H, W)
 ```
+
+`luminance` rend une échelle **perceptuelle**, où le gris moyen vaut ~0.5 : c'est elle que prennent en entrée les courbes de réponse `duotone` / `tritone`, dont les points de contrôle seraient illisibles sur une échelle linéaire. `relative_luminance` donne le Y linéaire, utilisé pour les mélanges.
 
 ### `src/inks.py`
 
@@ -208,7 +214,9 @@ La fusion du `config.json` local au projet, initialement prévue au lot 8, est f
 
 Point de vigilance : la conversion sRVB ↔ linéaire doit utiliser la vraie courbe sRVB (segment linéaire sous 0.04045, puis puissance 2.4), pas un gamma 2.2 approché. L'écart se voit dans les basses lumières, exactement là où la riso est déjà fragile.
 
-**Fin de lot** — aller-retour sRVB → linéaire → sRVB à moins de `1e-6`. Redimensionnement respectant le ratio. `apply_tone` avec les valeurs par défaut est l'identité — un profil sans section `tone` ne doit rien changer.
+Deux étapes passent par une table de correspondance plutôt que par un calcul par pixel : la conversion 8 bits → linéaire au chargement (256 entrées, exactes) et la courbe tonale (8192 entrées). Sur les 37 Mpx d'un A4 à 600 dpi — le réglage recommandé, donc le cas courant — la chaîne complète passe d'environ 8 s à 2 s, dont 1,4 s de rééchantillonnage.
+
+**Fin de lot** — aller-retour sRVB → linéaire → sRVB à moins de `1e-6`. Redimensionnement respectant le ratio. `apply_tone` avec les valeurs par défaut est l'identité — un profil sans section `tone` ne doit rien changer. La table tonale reste à moins d'un demi-niveau 8 bits de la courbe exacte.
 
 ---
 

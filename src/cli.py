@@ -8,14 +8,14 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 from . import __version__
 from .config import CONFIG_DIR, Profile, load_profile
 from .errors import NotImplementedYet, RisoError
+from .image import resolution_warning, source_size, target_long_edge_px
 from .project import PROJECT_DIR, Project, resolve_project
-
-MM_PER_INCH = 25.4
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -76,19 +76,27 @@ def cli_overrides(args: argparse.Namespace) -> dict:
     return overrides
 
 
-def _long_edge_px(long_edge_mm: float, dpi: int) -> int:
-    return round(long_edge_mm / MM_PER_INCH * dpi)
-
-
-def render_summary(project: Project, profile: Profile, *, verbose: bool = False) -> str:
+def render_summary(
+    project: Project,
+    profile: Profile,
+    *,
+    source_px: tuple[int, int] | None = None,
+    warnings: Sequence[str] | None = None,
+    verbose: bool = False,
+) -> str:
     """Résumé du run, affiché avant traitement et par `--dry-run`."""
     out = profile.output
     sep = profile.separation
     half = profile.halftone
+    warnings = profile.warnings if warnings is None else warnings
+
+    source = project.source.name
+    if source_px is not None:
+        source += f" ({source_px[0]} × {source_px[1]})"
 
     lines = [
         f"Projet     : {project.name}",
-        f"Source     : {project.source.name}",
+        f"Source     : {source}",
         f"Profil     : {profile.name}",
     ]
     if profile.description:
@@ -110,7 +118,7 @@ def render_summary(project: Project, profile: Profile, *, verbose: bool = False)
     else:
         lines.append("Trame      : diffusion d'erreur")
 
-    long_edge = _long_edge_px(out.long_edge_mm, out.dpi)
+    long_edge = target_long_edge_px(out.long_edge_mm, out.dpi)
     lines.append(
         f"Sortie     : {out.long_edge_mm:g} mm au grand côté @ {out.dpi} dpi "
         f"→ {long_edge} px, marge {out.margin_mm:g} mm, "
@@ -148,10 +156,10 @@ def render_summary(project: Project, profile: Profile, *, verbose: bool = False)
             "Profil issu de : " + ", ".join(profile.sources),
         ]
 
-    if profile.warnings:
+    if warnings:
         lines.append("")
-        lines.append(f"Avertissements ({len(profile.warnings)}) :")
-        lines += [f"  ! {w}" for w in profile.warnings]
+        lines.append(f"Avertissements ({len(warnings)}) :")
+        lines += [f"  ! {w}" for w in warnings]
 
     return "\n".join(lines)
 
@@ -162,15 +170,33 @@ def run(args: argparse.Namespace) -> int:
         args.config, project_dir=project.root, overrides=cli_overrides(args)
     )
 
-    print(render_summary(project, profile, verbose=args.verbose))
+    # Lecture de l'en-tête seulement : la sous-résolution se détecte sans
+    # décoder les pixels, donc avant tout calcul.
+    source_px = source_size(project.source)
+    warnings = list(profile.warnings)
+    under = resolution_warning(
+        max(source_px), target_long_edge_px(profile.output.long_edge_mm, profile.output.dpi)
+    )
+    if under:
+        warnings.append(under)
+
+    print(
+        render_summary(
+            project,
+            profile,
+            source_px=source_px,
+            warnings=warnings,
+            verbose=args.verbose,
+        )
+    )
 
     if args.dry_run:
         return 0
 
     raise NotImplementedYet(
-        "Le pipeline de traitement n'est pas encore écrit (lots 2 à 5, voir "
-        "doc/plan.md).\nLe profil et le projet sont valides : `--dry-run` "
-        "affiche le plan complet."
+        "La séparation n'est pas encore écrite (lots 3 à 5, voir doc/plan.md).\n"
+        "Le projet, le profil et la source sont valides : `--dry-run` affiche "
+        "le plan complet."
     )
 
 

@@ -8,7 +8,7 @@ Vue produit : où en est le projet et où il va. Pour le découpage du développ
 - [x] Plan d'implémentation
 - [x] **Lot 0** — socle, hiérarchie d'erreurs, harnais de tests
 - [x] **Lot 1** — résolution projet/profil, validation du JSON
-- [ ] **Lot 2** — chaîne image, colorimétrie, courbes tonales
+- [x] **Lot 2** — chaîne image, colorimétrie, courbes tonales
 - [ ] **Lot 3** — encres, séparations `luminance` et `duotone`
 - [ ] **Lot 4** — aperçu de surimpression, écriture des calques
 - [ ] **Lot 5** — `todo.md` et `run.json` → **v0.1**
